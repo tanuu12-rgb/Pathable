@@ -1,0 +1,5 @@
+- [Leaflet static import rule](leaflet-import.md) — never dynamic-import leaflet inside useEffect; always static import at top of file or React creates multiple instances.
+- [Zod in API server](zod-deps.md) — zod must be in artifacts/api-server/package.json `dependencies` (not devDependencies) or runtime validation fails.
+- [useListCampusAlerts signature](api-hook-signatures.md) — takes one optional arg `{ query: {...} }`, not two args like useListObstacles does.
+- [noImplicitReturns in pathable tsconfig](ts-implicit-returns.md) — useEffect callbacks with mixed return/no-return trigger TS7030; always return a single consistent cleanup or use a ref pattern.
+- [SpeechRecognition types](speech-recognition.md) — Web Speech API types not in tsconfig lib; use `(window as any).SpeechRecognition` and `event: any` to avoid TS errors.

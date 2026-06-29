@@ -1,0 +1,869 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: PathAble API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: obstacles
+    description: Obstacle report operations
+  - name: sos
+    description: SOS emergency alert operations
+  - name: safe-rooms
+    description: Sensory/quiet safe room operations
+  - name: first-aid
+    description: First aid and emergency resource operations
+  - name: safe-zones
+    description: Safe zone checkpoint operations
+  - name: admin
+    description: Admin operations
+  - name: gamification
+    description: Points and badge operations
+  - name: summary
+    description: Dashboard summary endpoints
+  - name: wellbeing
+    description: Student wellbeing check-in
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  # Obstacle Reports
+  /obstacles:
+    get:
+      operationId: listObstacles
+      tags: [obstacles]
+      summary: List all active obstacle reports
+      parameters:
+        - name: active
+          in: query
+          schema:
+            type: boolean
+        - name: zone
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of obstacle reports
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ObstacleReport"
+    post:
+      operationId: createObstacle
+      tags: [obstacles]
+      summary: Submit an obstacle report
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ObstacleInput"
+      responses:
+        "201":
+          description: Created obstacle report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ObstacleReport"
+
+  /obstacles/{id}:
+    get:
+      operationId: getObstacle
+      tags: [obstacles]
+      summary: Get a single obstacle report
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Obstacle report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ObstacleReport"
+
+  /obstacles/{id}/confirm:
+    post:
+      operationId: confirmObstacle
+      tags: [obstacles]
+      summary: Confirm an obstacle report
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmInput"
+      responses:
+        "200":
+          description: Updated obstacle report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ObstacleReport"
+
+  /obstacles/{id}/dismiss:
+    post:
+      operationId: dismissObstacle
+      tags: [obstacles]
+      summary: Dismiss an obstacle report (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated obstacle report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ObstacleReport"
+
+  /obstacles/{id}/escalate:
+    post:
+      operationId: escalateObstacle
+      tags: [obstacles]
+      summary: Escalate an obstacle report (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated obstacle report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ObstacleReport"
+
+  # SOS Alerts
+  /sos:
+    get:
+      operationId: listSosAlerts
+      tags: [sos]
+      summary: List SOS alerts
+      parameters:
+        - name: active
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: List of SOS alerts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SosAlert"
+    post:
+      operationId: createSosAlert
+      tags: [sos]
+      summary: Trigger an SOS alert
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SosInput"
+      responses:
+        "201":
+          description: Created SOS alert
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SosAlert"
+
+  /sos/{id}/resolve:
+    post:
+      operationId: resolveSosAlert
+      tags: [sos]
+      summary: Mark an SOS alert as resolved
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Resolved SOS alert
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SosAlert"
+
+  # Safe Rooms
+  /safe-rooms:
+    get:
+      operationId: listSafeRooms
+      tags: [safe-rooms]
+      summary: List all sensory/quiet safe rooms
+      responses:
+        "200":
+          description: List of safe rooms
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SafeRoom"
+
+  /safe-rooms/{id}/checkin:
+    post:
+      operationId: checkinSafeRoom
+      tags: [safe-rooms]
+      summary: Check in to a safe room
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated safe room
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SafeRoom"
+
+  /safe-rooms/{id}/checkout:
+    post:
+      operationId: checkoutSafeRoom
+      tags: [safe-rooms]
+      summary: Check out of a safe room
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated safe room
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SafeRoom"
+
+  # First Aid Resources
+  /first-aid:
+    get:
+      operationId: listFirstAidResources
+      tags: [first-aid]
+      summary: List all first aid and emergency resources
+      responses:
+        "200":
+          description: List of first aid resources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FirstAidResource"
+
+  /first-aid/{id}/status:
+    patch:
+      operationId: updateFirstAidStatus
+      tags: [first-aid]
+      summary: Update first aid resource status (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FirstAidStatusUpdate"
+      responses:
+        "200":
+          description: Updated resource
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FirstAidResource"
+
+  # Safe Zones
+  /safe-zones:
+    get:
+      operationId: listSafeZones
+      tags: [safe-zones]
+      summary: List all safe zone checkpoints
+      responses:
+        "200":
+          description: List of safe zone checkpoints
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SafeZone"
+
+  # Admin Alerts
+  /admin/alerts:
+    get:
+      operationId: listCampusAlerts
+      tags: [admin]
+      summary: List active campus-wide alerts
+      responses:
+        "200":
+          description: List of alerts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CampusAlert"
+    post:
+      operationId: createCampusAlert
+      tags: [admin]
+      summary: Push a campus-wide alert message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CampusAlertInput"
+      responses:
+        "201":
+          description: Created campus alert
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampusAlert"
+
+  /admin/alerts/{id}/dismiss:
+    post:
+      operationId: dismissCampusAlert
+      tags: [admin]
+      summary: Dismiss a campus-wide alert
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Dismissed alert
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampusAlert"
+
+  # Gamification
+  /gamification/leaderboard:
+    get:
+      operationId: getLeaderboard
+      tags: [gamification]
+      summary: Get top contributors leaderboard
+      responses:
+        "200":
+          description: Leaderboard entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeaderboardEntry"
+
+  /gamification/profile/{userId}:
+    get:
+      operationId: getGamificationProfile
+      tags: [gamification]
+      summary: Get a user's gamification profile (points and badges)
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Gamification profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GamificationProfile"
+
+  # AI Assistant
+  /ai/chat:
+    post:
+      operationId: aiChat
+      tags: [summary]
+      summary: Send a query to the AI navigation assistant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatMessage"
+      responses:
+        "200":
+          description: AI response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatReply"
+
+  # Wellbeing Check-In
+  /wellbeing/checkin:
+    post:
+      operationId: submitWellbeingCheckin
+      tags: [summary]
+      summary: Submit a daily wellbeing check-in
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WellbeingCheckinInput"
+      responses:
+        "201":
+          description: Check-in recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WellbeingCheckin"
+
+  /wellbeing/history/{userId}:
+    get:
+      operationId: getWellbeingHistory
+      tags: [summary]
+      summary: Get last 7 days of wellbeing check-ins for a user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Wellbeing history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WellbeingHistory"
+
+  # Summary / Dashboard
+  /summary/admin:
+    get:
+      operationId: getAdminSummary
+      tags: [summary]
+      summary: Get admin dashboard summary stats
+      responses:
+        "200":
+          description: Admin summary statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSummary"
+
+  /summary/zones:
+    get:
+      operationId: getZoneSummary
+      tags: [summary]
+      summary: Get incident counts grouped by campus zone
+      responses:
+        "200":
+          description: Zone incident summary
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ZoneSummary"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+
+    ObstacleReport:
+      type: object
+      required: [id, reporterName, zone, issueType, description, status, confirmations, createdAt, expiresAt]
+      properties:
+        id:
+          type: integer
+        reporterName:
+          type: string
+        zone:
+          type: string
+        issueType:
+          type: string
+          enum: [elevator_down, wet_floor, blocked_ramp, construction, missing_signage, other]
+        description:
+          type: string
+        status:
+          type: string
+          enum: [active, dismissed, escalated, expired]
+        confirmations:
+          type: integer
+        severity:
+          type: ["string", "null"]
+          enum: [low, medium, high, null]
+        lat:
+          type: ["number", "null"]
+        lng:
+          type: ["number", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+
+    ObstacleInput:
+      type: object
+      required: [reporterName, zone, issueType, description]
+      properties:
+        reporterName:
+          type: string
+        zone:
+          type: string
+        issueType:
+          type: string
+          enum: [elevator_down, wet_floor, blocked_ramp, construction, missing_signage, other]
+        description:
+          type: string
+        lat:
+          type: ["number", "null"]
+        lng:
+          type: ["number", "null"]
+
+    ConfirmInput:
+      type: object
+      required: [confirmerName]
+      properties:
+        confirmerName:
+          type: string
+
+    SosAlert:
+      type: object
+      required: [id, studentName, zone, disabilityType, status, createdAt]
+      properties:
+        id:
+          type: integer
+        studentName:
+          type: string
+        zone:
+          type: string
+        disabilityType:
+          type: string
+        status:
+          type: string
+          enum: [active, resolved]
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        resolvedAt:
+          type: ["string", "null"]
+
+    SosInput:
+      type: object
+      required: [studentName, zone, disabilityType]
+      properties:
+        studentName:
+          type: string
+        zone:
+          type: string
+        disabilityType:
+          type: string
+        notes:
+          type: ["string", "null"]
+
+    SafeRoom:
+      type: object
+      required: [id, name, building, floor, roomNumber, equipment, openingHours, status, currentOccupancy, capacity]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        building:
+          type: string
+        floor:
+          type: integer
+        roomNumber:
+          type: string
+        equipment:
+          type: array
+          items:
+            type: string
+        openingHours:
+          type: string
+        status:
+          type: string
+          enum: [available, partially_occupied, full, closed]
+        currentOccupancy:
+          type: integer
+        capacity:
+          type: integer
+        lat:
+          type: ["number", "null"]
+        lng:
+          type: ["number", "null"]
+
+    FirstAidResource:
+      type: object
+      required: [id, name, type, building, location, stocked, lastInspection, status]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+          enum: [first_aid_kit, aed, medical_room]
+        building:
+          type: string
+        location:
+          type: string
+        stocked:
+          type: array
+          items:
+            type: string
+        lastInspection:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [available, needs_restock, out_of_service]
+        lat:
+          type: ["number", "null"]
+        lng:
+          type: ["number", "null"]
+
+    FirstAidStatusUpdate:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [available, needs_restock, out_of_service]
+
+    SafeZone:
+      type: object
+      required: [id, name, type, description, lat, lng]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+          enum: [bench, covered_waiting, rest_area, medical_room]
+        description:
+          type: string
+        lat:
+          type: number
+        lng:
+          type: number
+        approved:
+          type: boolean
+
+    CampusAlert:
+      type: object
+      required: [id, message, createdBy, alertType, status, createdAt]
+      properties:
+        id:
+          type: integer
+        message:
+          type: string
+        createdBy:
+          type: string
+        alertType:
+          type: string
+          enum: [safety, maintenance, general]
+        status:
+          type: string
+          enum: [active, dismissed]
+        createdAt:
+          type: string
+          format: date-time
+
+    CampusAlertInput:
+      type: object
+      required: [message, createdBy]
+      properties:
+        message:
+          type: string
+        createdBy:
+          type: string
+        alertType:
+          type: string
+          enum: [safety, maintenance, general]
+
+    WellbeingCheckin:
+      type: object
+      required: [id, userId, mood, checkinDate, createdAt]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: string
+        mood:
+          type: string
+          enum: [energetic, moderate, low_energy, stressed]
+        checkinDate:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    WellbeingCheckinInput:
+      type: object
+      required: [userId, mood, checkinDate]
+      properties:
+        userId:
+          type: string
+        mood:
+          type: string
+          enum: [energetic, moderate, low_energy, stressed]
+        checkinDate:
+          type: string
+
+    WellbeingHistory:
+      type: object
+      required: [checkins]
+      properties:
+        checkins:
+          type: array
+          items:
+            $ref: "#/components/schemas/WellbeingCheckin"
+
+    LeaderboardEntry:
+      type: object
+      required: [rank, displayName, points, badgeCount]
+      properties:
+        rank:
+          type: integer
+        displayName:
+          type: string
+        points:
+          type: integer
+        badgeCount:
+          type: integer
+
+    GamificationProfile:
+      type: object
+      required: [userId, displayName, points, badges, reportsSubmitted, reportsConfirmed, routesCompleted]
+      properties:
+        userId:
+          type: string
+        displayName:
+          type: string
+        points:
+          type: integer
+        badges:
+          type: array
+          items:
+            $ref: "#/components/schemas/Badge"
+        reportsSubmitted:
+          type: integer
+        reportsConfirmed:
+          type: integer
+        routesCompleted:
+          type: integer
+
+    Badge:
+      type: object
+      required: [id, name, description, earned]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        earned:
+          type: boolean
+        earnedAt:
+          type: ["string", "null"]
+
+    ChatMessage:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+        context:
+          type: ["string", "null"]
+
+    ChatReply:
+      type: object
+      required: [reply, checklist]
+      properties:
+        reply:
+          type: string
+        checklist:
+          type: array
+          items:
+            type: string
+
+    AdminSummary:
+      type: object
+      required: [activeIncidentsToday, sosEventsThisWeek, mostReportedZone, avgResolutionMinutes, totalActiveAlerts]
+      properties:
+        activeIncidentsToday:
+          type: integer
+        sosEventsThisWeek:
+          type: integer
+        mostReportedZone:
+          type: string
+        avgResolutionMinutes:
+          type: ["number", "null"]
+        totalActiveAlerts:
+          type: integer
+
+    ZoneSummary:
+      type: object
+      required: [zone, incidentCount, lastReported]
+      properties:
+        zone:
+          type: string
+        incidentCount:
+          type: integer
+        lastReported:
+          type: ["string", "null"]

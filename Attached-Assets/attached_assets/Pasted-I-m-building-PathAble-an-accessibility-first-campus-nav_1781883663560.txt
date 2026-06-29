@@ -1,0 +1,39 @@
+I'm building PathAble, an accessibility-first campus navigation web app (React + Vite, Tailwind CSS, Leaflet.js for maps, Web Speech API for voice input, SpeechSynthesis for voice output, Anthropic Claude API for AI features). I need to upgrade the Navigate screen so live obstacle detection and turn-by-turn navigation run simultaneously in real time, and so guidance output adapts automatically to each user's saved accessibility profile.
+
+GOAL
+Right now navigation (turn-by-turn route steps) and camera-based obstacle detection are separate flows. I want them fused into ONE real-time experience on the Navigate screen, with output that automatically adapts per user (blind, deaf/hard of hearing, cognitive disability, combos).
+
+ARCHITECTURE TO BUILD
+
+1. Perception Engine
+   - Add a live camera feed (getUserMedia) on the Navigate screen.
+   - Run TensorFlow.js with the coco-ssd model (or MediaPipe Object Detection) on the video feed, checking for obstacles every 300-500ms. This must run fully on-device for low latency — do NOT call an LLM per frame.
+   - Draw bounding boxes on a canvas overlay on top of the video for any detected obstacle.
+
+2. Navigation Engine (already exists)
+   - Keep the existing Dijkstra-based routing engine and step-by-step turn instructions, advancing based on the user's position along the route.
+
+3. Orchestrator ("GuidanceBus")
+   - Build a central event bus that both engines publish to. Each event has shape: { type: 'turn' | 'obstacle', severity: 'routine' | 'critical', message: string }.
+   - When the Perception Engine flags an obstacle with high confidence, call the Claude API once (reusing the existing F16 severity classifier and F19 auto-description logic) to classify severity and generate a short description. Push that as an 'obstacle' event.
+   - The orchestrator must prioritize 'critical' obstacle events over routine turn instructions — a critical event interrupts/cancels any in-progress turn instruction immediately.
+
+4. Profile-based Output Adapters
+   - Read the user's saved profile (disability type + nav mode from F01, stored in localStorage).
+   - Build three renderer modules that subscribe to the GuidanceBus and only activate based on the profile's enabled nav modes:
+     a) VoiceRenderer — uses SpeechSynthesis to speak the event message. Must be interruptible: a critical event should cut off any voice currently speaking and speak immediately.
+     b) VisualRenderer — shows a large, bold, high-contrast banner with the event message. For 'critical' severity, add a brief full-screen flash/strobe effect using the existing Danger Red (#EF4444) token. Font size should scale up significantly for users with hearing-related profiles (treat this as the primary channel for deaf/hard-of-hearing users since they can't rely on voice).
+     c) HapticRenderer — uses navigator.vibrate() with two distinct patterns: a short single pulse for routine turn instructions, and a longer repeating pattern for critical obstacle alerts. This should fire for blind users (as a confirmation alongside voice) AND deaf users (since vibration is felt, not heard).
+   - If the profile has multiple nav modes enabled (e.g. "all combined"), fire all matching renderers for the same event simultaneously.
+   - For users with a cognitive-disability profile, before showing/speaking any 'turn' event message, send it through a quick Claude API call that rewrites it into the shortest possible plain-language version (e.g. turn "Turn right in 10 meters near the chemistry building" into "Turn right now"). Cache these rewrites where possible to avoid repeated calls for the same instruction.
+
+5. UI requirements
+   - Single Navigate screen: live camera feed as the background, canvas obstacle overlay on top of it, and the turn-by-turn banner/voice output running concurrently — not as separate screens or modes the user has to switch between.
+   - Keep using the existing color tokens, font (Inter), and card/button styles already defined in the app's design system.
+
+ACCEPTANCE CRITERIA
+- While a user is navigating, the camera obstacle detection must keep running without blocking or slowing down the turn-by-turn guidance.
+- A critical obstacle alert must visibly/audibly interrupt whatever routine instruction was playing, across whichever renderers are active for that user's profile.
+- Switching the test profile between "blind," "deaf," and "cognitive" in settings should visibly change which renderers fire and how messages are phrased, without needing a page reload.
+
+Please implement this incrementally: first the Perception Engine + canvas overlay, then the GuidanceBus, then the three renderers, then the profile-based activation logic.
