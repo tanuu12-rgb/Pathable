@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { useAiChat } from "@workspace/api-client-react";
-import { Send, Mic, MicOff, Volume2, VolumeX, MessageCircle } from "lucide-react";
+import { Send, Mic, MicOff, Volume2, VolumeX, MessageCircle, Hand, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SignLanguageInput } from "@/components/sign-language-input";
+import { SignLanguageAvatar } from "@/components/sign-language-avatar";
 
 interface Message {
   role: "user" | "assistant";
@@ -27,6 +29,9 @@ export default function Assistant() {
   const [input, setInput] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(true);
+  const [aslEnabled, setAslEnabled] = useState(true);
+  const [signInputActive, setSignInputActive] = useState(false);
+  const [lastAssistantMessage, setLastAssistantMessage] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
@@ -61,6 +66,7 @@ export default function Assistant() {
             checklist: data.checklist,
           };
           setMessages((prev) => [...prev, assistantMsg]);
+          setLastAssistantMessage(data.reply);
           speak(data.reply);
         },
         onError: () => {
@@ -111,16 +117,27 @@ export default function Assistant() {
           <h1 className="text-xl font-bold text-foreground">AI Assistant</h1>
           <p className="text-xs text-muted-foreground">Campus navigation help</p>
         </div>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => setTtsEnabled(!ttsEnabled)}
-          aria-label={ttsEnabled ? "Disable voice output" : "Enable voice output"}
-          className="gap-1.5 text-xs"
-        >
-          {ttsEnabled ? <Volume2 className="h-4 w-4 text-primary" /> : <VolumeX className="h-4 w-4 text-muted-foreground" />}
-          {ttsEnabled ? "Voice On" : "Voice Off"}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setAslEnabled(!aslEnabled)}
+            className="gap-1.5 text-xs"
+          >
+            <Hand className={`h-4 w-4 ${aslEnabled ? "text-primary" : "text-muted-foreground"}`} />
+            {aslEnabled ? "ASL On" : "ASL Off"}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setTtsEnabled(!ttsEnabled)}
+            aria-label={ttsEnabled ? "Disable voice output" : "Enable voice output"}
+            className="gap-1.5 text-xs"
+          >
+            {ttsEnabled ? <Volume2 className="h-4 w-4 text-primary" /> : <VolumeX className="h-4 w-4 text-muted-foreground" />}
+            {ttsEnabled ? "Voice On" : "Voice Off"}
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
@@ -180,6 +197,8 @@ export default function Assistant() {
         <div ref={bottomRef} />
       </div>
 
+      <SignLanguageAvatar text={lastAssistantMessage} isActive={aslEnabled && !!lastAssistantMessage} />
+
       {messages.length === 1 && (
         <div className="px-4 pb-2">
           <p className="text-xs text-muted-foreground mb-2">Try asking:</p>
@@ -194,6 +213,15 @@ export default function Assistant() {
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {signInputActive && (
+        <div className="px-4 pb-2">
+          <SignLanguageInput 
+            onTranslate={(text) => setInput(prev => prev ? prev + ' ' + text : text)} 
+            onClose={() => setSignInputActive(false)} 
+          />
         </div>
       )}
 
@@ -213,8 +241,17 @@ export default function Assistant() {
           </div>
           <Button
             size="icon"
+            variant={signInputActive ? "destructive" : "outline"}
+            onClick={() => { setSignInputActive(!signInputActive); if(isListening) toggleListening(); }}
+            aria-label="Sign Language Input"
+            className="rounded-full shrink-0 h-10 w-10"
+          >
+            <Video className="h-4 w-4" />
+          </Button>
+          <Button
+            size="icon"
             variant={isListening ? "destructive" : "outline"}
-            onClick={toggleListening}
+            onClick={() => { if(signInputActive) setSignInputActive(false); toggleListening(); }}
             aria-label={isListening ? "Stop listening" : "Start voice input"}
             className="rounded-full shrink-0 h-10 w-10"
           >
