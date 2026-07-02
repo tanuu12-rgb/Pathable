@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as tf from "@tensorflow/tfjs";
 import * as handpose from "@tensorflow-models/handpose";
+import * as fp from "fingerpose";
+import { ASL_GESTURES } from "@/lib/gestures";
 import { Camera, CameraOff, Loader2, StopCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -43,26 +45,31 @@ export function SignLanguageInput({ onTranslate, onClose }: SignLanguageInputPro
     };
   }, []);
 
-  const detectGesture = (landmarks: number[][]) => {
-    // Basic heuristics for simple gestures using y-coordinates (assuming upright hand)
-    // 8: Index, 12: Middle, 16: Ring, 20: Pinky, 4: Thumb
-    // PIP joints: 6, 10, 14, 18. Thumb IP: 3
-    
-    const isFingerOpen = (tip: number, pip: number) => landmarks[tip][1] < landmarks[pip][1];
-    
-    const indexOpen = isFingerOpen(8, 6);
-    const middleOpen = isFingerOpen(12, 10);
-    const ringOpen = isFingerOpen(16, 14);
-    const pinkyOpen = isFingerOpen(20, 18);
-    
-    // Thumbs up: thumb tip is higher than ring/pinky PIP, other fingers closed
-    const thumbUp = landmarks[4][1] < landmarks[14][1] && !indexOpen && !middleOpen && !ringOpen && !pinkyOpen;
+  // We now use fingerpose for detection
+  const estimatorRef = useRef<any>(null);
 
-    if (thumbUp) return "Yes";
-    if (indexOpen && middleOpen && !ringOpen && !pinkyOpen) return "Hello"; // Peace sign
-    if (indexOpen && middleOpen && ringOpen && pinkyOpen) return "Stop or Help"; // Open hand
-    
-    return null;
+  useEffect(() => {
+    estimatorRef.current = new fp.GestureEstimator(ASL_GESTURES);
+  }, []);
+
+  const detectGesture = (landmarks: number[][]) => {
+     if (!estimatorRef.current) return null;
+     
+     // Fingerpose expects a specific format. Handpose provides the array format if mapped to 3D coords,
+     // but fingerpose typically takes the full prediction object or the landmarks array.
+     // Handpose returns landmarks as [x, y, z]. Fingerpose expects this.
+     
+     const est = estimatorRef.current.estimate(landmarks, 8.5); // Minimum confidence 8.5/10
+     
+     if (est.gestures.length > 0) {
+       // Find with highest confidence
+       const result = est.gestures.reduce((p: any, c: any) => { 
+         return (p.score > c.score) ? p : c;
+       });
+       return result.name;
+     }
+
+     return null;
   };
 
   const runDetection = useCallback(() => {
@@ -112,6 +119,9 @@ export function SignLanguageInput({ onTranslate, onClose }: SignLanguageInputPro
 
   const startCamera = async () => {
     try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+         throw new Error("getUserMedia not supported in this browser. Ensure you are using HTTPS or localhost.");
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
       streamRef.current = stream;
       if (videoRef.current) {
@@ -119,8 +129,9 @@ export function SignLanguageInput({ onTranslate, onClose }: SignLanguageInputPro
         videoRef.current.play();
       }
       runDetection();
-    } catch {
-      setError("Camera permission denied.");
+    } catch (e: any) {
+      console.error("Camera access error:", e);
+      setError(`Camera Error: ${e.message || e.toString() || "Permission denied."}`);
     }
   };
 
@@ -185,7 +196,7 @@ export function SignLanguageInput({ onTranslate, onClose }: SignLanguageInputPro
               <span className="text-sm font-bold text-primary">{lastGesture}</span>
             ) : (
               <span className="text-xs text-muted-foreground italic">
-                {isLoading ? "Waiting..." : "Make a gesture (Peace sign, Thumbs up, or Open hand)..."}
+                {isLoading ? "Waiting..." : "Try ASL letters: A, B, C, D, E, F, L, V, W, Y or ILY!"}
               </span>
             )}
          </div>

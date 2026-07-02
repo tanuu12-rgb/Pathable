@@ -333,6 +333,9 @@ importers:
       '@tensorflow/tfjs':
         specifier: ^4.22.0
         version: 4.22.0(seedrandom@3.0.5)
+      fingerpose:
+        specifier: ^0.1.0
+        version: 0.1.0
       leaflet:
         specifier: ^1.9.4
         version: 1.9.4
@@ -2947,6 +2950,9 @@ packages:
   find-up@8.0.0:
     resolution: {integrity: sha512-JGG8pvDi2C+JxidYdIwQDyS/CgcrIdh18cvgxcBge3wSHRQOrooMD3GlFBcmMJAN9M42SAZjDp5zv1dglJjwww==}
     engines: {node: '>=20'}
+
+  fingerpose@0.1.0:
+    resolution: {integrity: sha512-OXIRuRTgukBOo4xUO+vPchzHftZOPxO7VRh4HDjTg5NGr4gSkiY+LQShjsKAzmpRiRdmTgDh0dNsGpWa1Jsx3Q==}
 
   form-data@4.0.6:
     resolution: {integrity: sha512-vKatAh4SlVfgbv+YtmhiRjhEMJsYpsG1Y2rMQtR+SVSbytsSD1YGzDIcrAJmdFec88u/+VoGmxnl+80gL1tRCQ==}
@@ -6320,6 +6326,8 @@ snapshots:
     dependencies:
       locate-path: 8.0.0
       unicorn-magic: 0.3.0
+
+  fingerpose@0.1.0: {}
 
   form-data@4.0.6:
     dependencies:
