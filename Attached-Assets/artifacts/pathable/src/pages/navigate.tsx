@@ -30,20 +30,15 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
 });
 
-const CAMPUS_CENTER: [number, number] = [51.505, -0.09];
+const CAMPUS_CENTER: [number, number] = [19.075541, 72.991941];
 
 const CAMPUS_BUILDINGS = [
-  { name: "Library",          lat: 51.5060, lng: -0.0910 },
-  { name: "Science Block",    lat: 51.5065, lng: -0.0895 },
-  { name: "Engineering Hall", lat: 51.5070, lng: -0.0880 },
-  { name: "Student Centre",   lat: 51.5050, lng: -0.0900 },
-  { name: "Admin Building",   lat: 51.5045, lng: -0.0925 },
-  { name: "Medical Centre",   lat: 51.5040, lng: -0.0930 },
-  { name: "Sports Complex",   lat: 51.5090, lng: -0.0870 },
-  { name: "Cafeteria",        lat: 51.5045, lng: -0.0905 },
-  { name: "Block A",          lat: 51.5070, lng: -0.0875 },
-  { name: "Block B",          lat: 51.5080, lng: -0.0890 },
-  { name: "Block C",          lat: 51.5055, lng: -0.0875 },
+  { name: "Classroom",    lat: 19.075541, lng: 72.991941 },
+  { name: "HOD Cabin",    lat: 19.075511, lng: 72.991790 },
+  { name: "Computer Lab", lat: 19.075526, lng: 72.991729 },
+  { name: "Washroom",     lat: 19.075515, lng: 72.991749 },
+  { name: "Library",      lat: 19.075466, lng: 72.991408 },
+  { name: "Foyer",        lat: 19.075565, lng: 72.991730 },
 ];
 
 const SAFE_ZONES = [
@@ -76,16 +71,44 @@ const ROUTE_OPTIONS = [
   { id: "rest_stops",       label: "Most Rest Stops",   desc: "Passes safe zone checkpoints" },
 ];
 
-const TURN_INSTRUCTIONS = [
-  "Start at Student Centre main entrance",
-  "Head north on Central Path (paved, step-free)",
-  "Turn left at the Library junction",
-  "Continue past the Library Garden bench (rest stop)",
-  "Turn right at Science Block path",
-  "Arrive at destination — accessible entrance on left",
-];
-
 const DETECT_INTERVAL_MS = 400;
+
+function toRadians(degrees: number) {
+  return degrees * Math.PI / 180;
+}
+function toDegrees(radians: number) {
+  return radians * 180 / Math.PI;
+}
+function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number) {
+  const R = 6371000;
+  const dLat = toRadians(lat2 - lat1);
+  const dLng = toRadians(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * Math.sin(dLng / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+function calculateBearing(lat1: number, lng1: number, lat2: number, lng2: number) {
+  const φ1 = toRadians(lat1);
+  const φ2 = toRadians(lat2);
+  const Δλ = toRadians(lng2 - lng1);
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return (toDegrees(Math.atan2(y, x)) + 360) % 360;
+}
+function bearingToDirection(bearing: number) {
+  const directions = [
+    "north",
+    "north-east",
+    "east",
+    "south-east",
+    "south",
+    "south-west",
+    "west",
+    "north-west",
+  ];
+  return directions[Math.round(bearing / 45) % 8];
+}
 
 function getCrowd(name: string): "low" | "medium" | "high" {
   return CROWD_MAP[new Date().getHours()]?.[name] ?? "low";
@@ -140,14 +163,12 @@ export default function Navigate() {
   const currentTurnRef    = useRef<GuidanceEvent | null>(null);
   const obstacleClearRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flashClearRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const stepTimerRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Step-chain refs — avoid stale closures inside utterance.onend callbacks
-  const navStepRef        = useRef(0);
+  const positionWatchRef  = useRef<number | null>(null);
+  const userMarkerRef     = useRef<L.CircleMarker | null>(null);
+  const routeLineRef      = useRef<L.Polyline | null>(null);
+  const lastAnnounceBearingRef = useRef<number | null>(null);
+  const lastAnnounceTimeRef    = useRef<number | null>(null);
   const voiceMutedRef     = useRef(false);
-  const routeActiveRef    = useRef(false);
-  // Reassigned each render so closures always use the latest version
-  const speakStepRef      = useRef<(step: number) => void>(() => {});
 
   // Map state
   const [showObstacles,  setShowObstacles]  = useState(true);
@@ -157,7 +178,13 @@ export default function Navigate() {
   const [selectedRoute,  setSelectedRoute]  = useState("shortest");
   const [destination,    setDestination]    = useState("");
   const [routeActive,    setRouteActive]    = useState(false);
-  const [navStep,        setNavStep]        = useState(0);
+  const [currentPosition, setCurrentPosition] = useState<{ lat: number; lng: number; accuracy?: number } | null>(null);
+  const [distanceToDestination, setDistanceToDestination] = useState<number | null>(null);
+  const [navigationDirection, setNavigationDirection] = useState<string | null>(null);
+  const [navigationBearing, setNavigationBearing] = useState<number | null>(null);
+  const [navigationBanner, setNavigationBanner] = useState<string | null>(null);
+  const [gpsError, setGpsError] = useState<string | null>(null);
+  const [lowAccuracyWarning, setLowAccuracyWarning] = useState(false);
 
   // Camera state
   const [cameraMode,   setCameraMode]   = useState(false);
@@ -171,75 +198,6 @@ export default function Navigate() {
 
   const profile   = profileRef.current;
   const largeText = isLargeTextProfile(profile);
-
-  // ── Step-chain: speak instruction → wait for onend → advance ─────────────
-  // Reassigned every render — closures inside utterance.onend always call latest
-  speakStepRef.current = (step: number) => {
-    const rawMsg    = TURN_INSTRUCTIONS[step];
-    const p         = profileRef.current;
-    const isMuted   = voiceMutedRef.current;
-    const isLast    = step === TURN_INSTRUCTIONS.length - 1;
-    const displayMsg = shouldSimplifyCognitive(p) ? simplifyCognitive(rawMsg) : rawMsg;
-
-    // Publish to GuidanceBus → fires VisualRenderer + HapticRenderer
-    guidanceBus.publish({ type: "turn", severity: "routine", message: rawMsg });
-
-    // ── Voice: speak directly so we can hook utterance.onend ──
-    if (shouldUseVoice(p) && !isMuted && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(displayMsg);
-      u.volume = 0.9;
-      u.rate   = 1.0;
-
-      if (!isLast) {
-        u.onend = () => {
-          // Speech finished → give user 3 s to act, then advance
-          stepTimerRef.current = setTimeout(() => {
-            if (!routeActiveRef.current) return;
-            const next = navStepRef.current + 1;
-            if (next < TURN_INSTRUCTIONS.length) {
-              setNavStep(next);
-              navStepRef.current = next;
-              speakStepRef.current(next);
-            }
-          }, 3000);
-        };
-      }
-      window.speechSynthesis.speak(u);
-    } else if (!isLast) {
-      // No voice (deaf profile or muted) → fixed 6 s timer per step
-      stepTimerRef.current = setTimeout(() => {
-        if (!routeActiveRef.current) return;
-        const next = navStepRef.current + 1;
-        if (next < TURN_INSTRUCTIONS.length) {
-          setNavStep(next);
-          navStepRef.current = next;
-          speakStepRef.current(next);
-        }
-      }, 6000);
-    }
-  };
-
-  // Manual "next step" skip — cancels pending timer, re-speaks immediately
-  function manualAdvanceStep() {
-    if (stepTimerRef.current !== null) { clearTimeout(stepTimerRef.current); stepTimerRef.current = null; }
-    window.speechSynthesis.cancel();
-    const next = navStepRef.current + 1;
-    if (next < TURN_INSTRUCTIONS.length) {
-      setNavStep(next);
-      navStepRef.current = next;
-      speakStepRef.current(next);
-    }
-  }
-
-  function manualPrevStep() {
-    if (stepTimerRef.current !== null) { clearTimeout(stepTimerRef.current); stepTimerRef.current = null; }
-    window.speechSynthesis.cancel();
-    const prev = Math.max(0, navStepRef.current - 1);
-    setNavStep(prev);
-    navStepRef.current = prev;
-    speakStepRef.current(prev);
-  }
 
   // ── GuidanceBus: subscribe and dispatch to renderers ─────────────────────
   useEffect(() => {
@@ -277,27 +235,12 @@ export default function Navigate() {
       }
 
       // VoiceRenderer — obstacle alerts only
-      // Turn voice is handled by the step-chain (speakStepRef) so onend can trigger next step
       if (event.type === "obstacle" && shouldUseVoice(p) && !mutedNow) {
-        // Critical obstacles always interrupt any in-progress turn speech
         window.speechSynthesis.cancel();
-        // Also cancel the pending step timer so obstacle speech isn't cut short
-        if (event.severity === "critical" && stepTimerRef.current !== null) {
-          clearTimeout(stepTimerRef.current);
-          stepTimerRef.current = null;
-        }
         const u = new SpeechSynthesisUtterance(displayMsg);
         u.volume = event.severity === "critical" ? 1.0 : 0.85;
         u.rate   = event.severity === "critical" ? 1.2 : 1.0;
         u.pitch  = event.severity === "critical" ? 1.3 : 1.0;
-        // After obstacle speech ends, resume current step chain
-        u.onend = () => {
-          if (routeActiveRef.current && event.severity === "critical") {
-            stepTimerRef.current = setTimeout(() => {
-              speakStepRef.current(navStepRef.current);
-            }, 2000);
-          }
-        };
         window.speechSynthesis.speak(u);
       }
 
@@ -390,27 +333,6 @@ obstacles.forEach(o => {
     g.addTo(map);
     obstacleGroupRef.current = g;
   }, [obstacles, showObstacles]);
-
-  // ── Turn step chain: starts on routeActive, driven by speech completion ────
-  useEffect(() => {
-    if (!routeActive) {
-      routeActiveRef.current = false;
-      if (stepTimerRef.current !== null) { clearTimeout(stepTimerRef.current); stepTimerRef.current = null; }
-      window.speechSynthesis.cancel();
-      return;
-    }
-    routeActiveRef.current = true;
-    navStepRef.current = 0;
-    setNavStep(0);
-    // Kick off the chain — each step speaks, waits for onend, then advances
-    speakStepRef.current(0);
-
-    return () => {
-      routeActiveRef.current = false;
-      if (stepTimerRef.current !== null) { clearTimeout(stepTimerRef.current); stepTimerRef.current = null; }
-      window.speechSynthesis.cancel();
-    };
-  }, [routeActive]);
 
   // ── Clean up timers on unmount ────────────────────────────────────────────
   useEffect(() => {
@@ -547,6 +469,156 @@ obstacles.forEach(o => {
     }
   }
 
+  function speakNavigationMessage(message: string) {
+    const p = profileRef.current;
+    if (voiceMutedRef.current || !shouldUseVoice(p) || !('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(message);
+    u.volume = 0.9;
+    u.rate = 1.0;
+    window.speechSynthesis.speak(u);
+  }
+
+  function clearNavigationWatch() {
+    if (positionWatchRef.current !== null) {
+      navigator.geolocation.clearWatch(positionWatchRef.current);
+      positionWatchRef.current = null;
+    }
+    if (userMarkerRef.current) {
+      userMarkerRef.current.remove();
+      userMarkerRef.current = null;
+    }
+    if (routeLineRef.current) {
+      routeLineRef.current.remove();
+      routeLineRef.current = null;
+    }
+  }
+
+  useEffect(() => {
+    if (!routeActive || !destination) {
+      clearNavigationWatch();
+      setNavigationBanner(null);
+      setDistanceToDestination(null);
+      setNavigationDirection(null);
+      setNavigationBearing(null);
+      setCurrentPosition(null);
+      setGpsError(null);
+      setLowAccuracyWarning(false);
+      lastAnnounceBearingRef.current = null;
+      lastAnnounceTimeRef.current = null;
+      return;
+    }
+
+    if (!navigator.geolocation) {
+      setGpsError("GPS is not available in this browser.");
+      return;
+    }
+
+    const destinationPoint = CAMPUS_BUILDINGS.find((b) => b.name === destination);
+    if (!destinationPoint) {
+      setGpsError("Destination coordinates not found.");
+      return;
+    }
+
+    setGpsError(null);
+    setLowAccuracyWarning(false);
+    lastAnnounceBearingRef.current = null;
+    lastAnnounceTimeRef.current = null;
+
+    const updateMapLocation = (position: GeolocationPosition) => {
+      const { latitude, longitude, accuracy } = position.coords;
+      const distance = haversineDistance(latitude, longitude, destinationPoint.lat, destinationPoint.lng);
+      const bearing = calculateBearing(latitude, longitude, destinationPoint.lat, destinationPoint.lng);
+      const direction = bearingToDirection(bearing);
+      const roundedDistance = Math.max(0, Math.round(distance));
+      const banner = distance <= 10
+        ? `You have arrived at ${destination}`
+        : `Head ${direction}. ${roundedDistance}m to ${destination}`;
+
+      setCurrentPosition({ lat: latitude, lng: longitude, accuracy });
+      setDistanceToDestination(distance <= 10 ? 0 : distance);
+      setNavigationDirection(distance <= 10 ? "" : direction);
+      setNavigationBearing(distance <= 10 ? null : bearing);
+      setNavigationBanner(banner);
+      setLowAccuracyWarning(accuracy > 50);
+
+      const displayEvent: GuidanceEvent = {
+        type: "turn",
+        severity: "routine",
+        message: shouldSimplifyCognitive(profileRef.current) ? simplifyCognitive(banner) : banner,
+      };
+      currentTurnRef.current = displayEvent;
+      if (!obstacleClearRef.current) setActiveBanner(displayEvent);
+
+      const now = Date.now();
+      const shouldAnnounce =
+        !voiceMutedRef.current &&
+        shouldUseVoice(profileRef.current) &&
+        (
+          lastAnnounceBearingRef.current === null ||
+          Math.abs(bearing - lastAnnounceBearingRef.current) > 20 ||
+          now - (lastAnnounceTimeRef.current ?? 0) >= 15000
+        );
+
+      if (shouldAnnounce) {
+        lastAnnounceBearingRef.current = bearing;
+        lastAnnounceTimeRef.current = now;
+        speakNavigationMessage(banner);
+      }
+
+      if (distance <= 10) {
+        speakNavigationMessage(`You have arrived at ${destination}`);
+        setRouteActive(false);
+        return;
+      }
+
+      const map = leafletMapRef.current;
+      if (map) {
+        if (userMarkerRef.current) {
+          userMarkerRef.current.setLatLng([latitude, longitude]);
+        } else {
+          userMarkerRef.current = L.circleMarker([latitude, longitude], {
+            radius: 8,
+            fillColor: "#2563eb",
+            color: "#ffffff",
+            weight: 2,
+            fillOpacity: 0.9,
+          }).addTo(map);
+        }
+
+        if (routeLineRef.current) {
+          routeLineRef.current.setLatLngs([[latitude, longitude], [destinationPoint.lat, destinationPoint.lng]]);
+        } else {
+          routeLineRef.current = L.polyline(
+            [[latitude, longitude], [destinationPoint.lat, destinationPoint.lng]],
+            { color: "#2563eb", weight: 3, opacity: 0.8 },
+          ).addTo(map);
+        }
+      }
+    };
+
+    const handlePositionError = (error: GeolocationPositionError) => {
+      if (error.code === error.PERMISSION_DENIED) {
+        setGpsError("Please enable location access to use navigation");
+      } else if (error.code === error.POSITION_UNAVAILABLE) {
+        setGpsError("GPS signal lost, please move to an open area");
+      } else {
+        setGpsError("Unable to retrieve GPS position.");
+      }
+    };
+
+    const watchId = navigator.geolocation.watchPosition(updateMapLocation, handlePositionError, {
+      enableHighAccuracy: true,
+      maximumAge: 1000,
+      timeout: 15000,
+    });
+    positionWatchRef.current = watchId;
+
+    return () => {
+      clearNavigationWatch();
+    };
+  }, [routeActive, destination]);
+
   // ── Derived profile values ────────────────────────────────────────────────
   const wellbeingToday = (() => {
     try {
@@ -586,18 +658,8 @@ obstacles.forEach(o => {
                 setVoiceMuted(next);
                 voiceMutedRef.current = next;
                 window.speechSynthesis.cancel();
-                // If muting mid-navigation, the onend chain breaks — restart with timer fallback
-                if (next && routeActiveRef.current) {
-                  if (stepTimerRef.current !== null) { clearTimeout(stepTimerRef.current); stepTimerRef.current = null; }
-                  stepTimerRef.current = setTimeout(() => {
-                    if (!routeActiveRef.current) return;
-                    speakStepRef.current(navStepRef.current + 1 < TURN_INSTRUCTIONS.length ? navStepRef.current + 1 : navStepRef.current);
-                  }, 5000);
-                }
-                // If unmuting mid-navigation, cancel timer and re-speak current step
-                if (!next && routeActiveRef.current) {
-                  if (stepTimerRef.current !== null) { clearTimeout(stepTimerRef.current); stepTimerRef.current = null; }
-                  speakStepRef.current(navStepRef.current);
+                if (!next && routeActive && navigationBanner) {
+                  speakNavigationMessage(navigationBanner);
                 }
               }}
               className={`p-1.5 rounded-full transition-colors ${voiceMuted ? "bg-red-100 text-red-600" : "bg-muted text-muted-foreground hover:text-foreground"}`}
@@ -781,7 +843,7 @@ obstacles.forEach(o => {
                 } ${activeBanner.type === "obstacle" || cameraMode ? "text-white" : "text-foreground"}`}>
                   {activeBanner.type === "obstacle"
                     ? (activeBanner.severity === "critical" ? "🚨 Critical Obstacle" : "⚠️ Obstacle Detected")
-                    : `Step ${navStep + 1} of ${TURN_INSTRUCTIONS.length}`}
+                    : "Navigation update"}
                 </p>
                 <p className={`mt-0.5 leading-snug ${
                   largeText ? "text-lg font-semibold" : "text-sm"
@@ -789,31 +851,6 @@ obstacles.forEach(o => {
                   {activeBanner.message}
                 </p>
               </div>
-              {/* Prev / Next step controls — only on turn banners */}
-              {activeBanner.type === "turn" && routeActive && (
-                <div className="flex flex-col gap-1 shrink-0 ml-1">
-                  <button
-                    onClick={manualPrevStep}
-                    disabled={navStep === 0}
-                    className={`text-[10px] font-bold px-2 py-1 rounded-md transition-colors disabled:opacity-30 ${
-                      cameraMode ? "bg-white/20 text-white hover:bg-white/30" : "bg-muted text-muted-foreground hover:text-foreground"
-                    }`}
-                    aria-label="Previous step"
-                  >
-                    ‹ Prev
-                  </button>
-                  <button
-                    onClick={manualAdvanceStep}
-                    disabled={navStep >= TURN_INSTRUCTIONS.length - 1}
-                    className={`text-[10px] font-bold px-2 py-1 rounded-md transition-colors disabled:opacity-30 ${
-                      cameraMode ? "bg-white/20 text-white hover:bg-white/30" : "bg-primary text-primary-foreground hover:bg-primary/90"
-                    }`}
-                    aria-label="Next step"
-                  >
-                    Next ›
-                  </button>
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -850,7 +887,7 @@ obstacles.forEach(o => {
                   <Navigation className="h-4 w-4 text-primary" />
                   Navigating to {destination}
                   <span className="text-xs text-muted-foreground font-normal">
-                    — Step {navStep + 1}/{TURN_INSTRUCTIONS.length}
+                    — {distanceToDestination !== null ? `${Math.round(distanceToDestination)}m to go` : "Calculating..."}
                   </span>
                 </p>
                 <button
@@ -860,41 +897,56 @@ obstacles.forEach(o => {
                   Cancel
                 </button>
               </div>
-              <ol className="space-y-1.5">
-                {TURN_INSTRUCTIONS.map((step, i) => (
-                  <li
-                    key={i}
-                    onClick={() => {
-                      if (stepTimerRef.current !== null) { clearTimeout(stepTimerRef.current); stepTimerRef.current = null; }
-                      window.speechSynthesis.cancel();
-                      setNavStep(i);
-                      navStepRef.current = i;
-                      speakStepRef.current(i);
-                    }}
-                    className={`flex items-start gap-2 text-xs transition-opacity cursor-pointer rounded-lg px-1 py-0.5 hover:bg-muted/60 ${i < navStep ? "opacity-40" : i === navStep ? "opacity-100" : "opacity-60"}`}
-                    title={`Jump to step ${i + 1}`}
+              {gpsError && (
+                <div className="mb-2 p-2 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
+                  {gpsError}
+                </div>
+              )}
+              {lowAccuracyWarning && !gpsError && (
+                <div className="mb-2 p-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">
+                  Low GPS accuracy - directions may be approximate
+                </div>
+              )}
+              <div className="space-y-2 text-sm text-foreground">
+                <div className="flex items-center gap-3">
+                  <span
+                    className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 text-slate-700"
+                    style={{ transform: `rotate(${navigationBearing ?? 0}deg)` }}
                   >
-                    <span className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold mt-0.5 ${
-                      i === navStep ? "bg-primary text-primary-foreground" : i < navStep ? "bg-green-500 text-white" : "bg-muted text-muted-foreground"
-                    }`}>
-                      {i < navStep ? "✓" : i + 1}
-                    </span>
-                    <span className={`leading-relaxed ${i === navStep ? "font-semibold text-foreground" : i < navStep ? "line-through text-muted-foreground" : "text-muted-foreground"}`}>{step}</span>
-                  </li>
-                ))}
-              </ol>
+                    <span className="block w-3 h-3 border-t-2 border-r-2 border-slate-700 transform translate-y-0.5" />
+                  </span>
+                  <div>
+                    <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Direction</div>
+                    <div className="text-sm font-semibold">{navigationDirection ?? "Calculating..."}</div>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
+                  {navigationBanner ?? "Waiting for GPS signal..."}
+                </div>
+              </div>
             </div>
           )}
         </div>
       )}
 
-      {/* In camera mode, show step progress at bottom instead of full route list */}
       {cameraMode && routeActive && !activeBanner && (
         <div className="shrink-0 px-4 py-2 bg-card/90 backdrop-blur-md border-t border-border flex items-center gap-3">
-          <Navigation className="h-4 w-4 text-primary shrink-0" />
-          <p className="text-xs text-foreground font-medium flex-1 truncate">{TURN_INSTRUCTIONS[navStep]}</p>
+          <span
+            className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 text-slate-700"
+            style={{ transform: `rotate(${navigationBearing ?? 0}deg)` }}
+          >
+            <span className="block w-3 h-3 border-t-2 border-r-2 border-slate-700 transform translate-y-0.5" />
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-foreground truncate">
+              {navigationDirection ? `Head ${navigationDirection}` : "Calculating direction..."}
+            </p>
+            <p className="text-[11px] text-muted-foreground truncate">
+              {distanceToDestination !== null ? `${Math.round(distanceToDestination)}m to ${destination}` : "Waiting for GPS..."}
+            </p>
+          </div>
           <button
-            onClick={() => { setRouteActive(false); setActiveBanner(null); }}
+            onClick={() => { setRouteActive(false); setActiveBanner(null); currentTurnRef.current = null; }}
             className="text-xs text-muted-foreground hover:text-foreground shrink-0"
           >
             Cancel

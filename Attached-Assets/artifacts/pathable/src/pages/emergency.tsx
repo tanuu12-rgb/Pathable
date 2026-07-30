@@ -99,7 +99,7 @@ export default function Emergency() {
     <div className="max-w-lg mx-auto px-4 pt-6 pb-4">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground">Emergency & First Aid</h1>
-        <p className="text-sm text-muted-foreground mt-1">Campus emergency resources — Lakewood University</p>
+        <p className="text-sm text-muted-foreground mt-1">Campus emergency resources — FCRIT, Vashi</p>
       </div>
 
       {/* SOS Button */}

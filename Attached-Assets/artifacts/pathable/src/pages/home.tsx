@@ -88,7 +88,7 @@ export default function Home() {
       <div className="flex items-start justify-between mb-5">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Hi, {firstName} 👋</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">Lakewood University — today's campus</p>
+          <p className="text-muted-foreground text-sm mt-0.5">FCRIT, Vashi — today's campus</p>
         </div>
         <button
           onClick={() => setShowWellbeing(true)}

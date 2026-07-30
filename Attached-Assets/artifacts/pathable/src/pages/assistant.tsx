@@ -23,7 +23,7 @@ export default function Assistant() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "Hi! I'm PathAble's campus assistant. I can help you navigate Lakewood University accessibly, find facilities, and answer questions about campus accessibility. What do you need?",
+      content: "Hi! I'm PathAble's campus assistant. I can help you navigate FCRIT, Vashi accessibly, find facilities, and answer questions about campus accessibility. What do you need?",
     },
   ]);
   const [input, setInput] = useState("");

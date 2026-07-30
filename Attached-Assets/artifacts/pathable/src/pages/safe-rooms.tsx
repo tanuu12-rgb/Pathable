@@ -47,7 +47,7 @@ export default function SafeRooms() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground">Sensory Safe Rooms</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Quiet and sensory-friendly spaces across Lakewood University
+          Quiet and sensory-friendly spaces across FCRIT, Vashi
         </p>
       </div>
 

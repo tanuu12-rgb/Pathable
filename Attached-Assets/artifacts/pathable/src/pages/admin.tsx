@@ -94,7 +94,7 @@ const chartData = (Array.isArray(zoneSummary) ? zoneSummary : []).slice(0, 8).ma
     <div className="max-w-2xl mx-auto px-4 pt-6 pb-4">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground">Admin Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-1">Lakewood University — Crisis Command</p>
+        <p className="text-sm text-muted-foreground mt-1">FCRIT, Vashi — Crisis Command</p>
       </div>
 
       {/* Summary Stats */}
