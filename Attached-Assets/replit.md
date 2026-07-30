@@ -1,6 +1,6 @@
 # PathAble
 
-AI-powered accessible campus navigation app for differently abled students at Lakewood University.
+AI-powered accessible campus navigation app for differently abled students at FCRIT, Vashi.
 
 ## Run & Operate
 

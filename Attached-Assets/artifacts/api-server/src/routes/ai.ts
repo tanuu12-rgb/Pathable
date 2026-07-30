@@ -3,7 +3,7 @@ import { z } from "zod";
 
 const router = Router();
 
-// Campus knowledge base for Lakewood University
+// Campus knowledge base for FCRIT, Vashi
 const CAMPUS_KB = {
   buildings: [
     { name: "Library", accessible: true, entrances: ["Main entrance (ramp)", "East entrance (automatic door)"], elevators: true, accessibleRestrooms: "Floor 1, Floor 2, Floor 3" },
@@ -138,7 +138,7 @@ function generateReply(message: string): string {
   }
 
   // Default
-  return `I'm PathAble's campus assistant for Lakewood University. I can help with: finding accessible routes to any building, locating restrooms and elevators, finding sensory/quiet rooms, reporting obstacles, and emergency procedures. What would you like to know?`;
+  return `I'm PathAble's campus assistant for FCRIT, Vashi. I can help with: finding accessible routes to any building, locating restrooms and elevators, finding sensory/quiet rooms, reporting obstacles, and emergency procedures. What would you like to know?`;
 }
 
 // POST /ai/chat
