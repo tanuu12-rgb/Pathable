@@ -12,6 +12,7 @@ import {
   Stethoscope, Camera, CameraOff, Loader2, Volume2, VolumeX,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import VoiceNavigation from "@/components/voice-navigation";
 import { guidanceBus, type GuidanceEvent } from "@/lib/guidance-bus";
 import {
   shouldUseVoice, shouldUseVisual, shouldUseHaptic,
@@ -191,6 +192,7 @@ export default function Navigate() {
   const [modelLoading, setModelLoading] = useState(false);
   const [cameraError,  setCameraError]  = useState<string | null>(null);
   const [voiceMuted,   setVoiceMuted]   = useState(false);
+  const [latestDetections, setLatestDetections] = useState<any[]>([]);
 
   // Guidance output state
   const [activeBanner,  setActiveBanner]  = useState<GuidanceEvent | null>(null);
@@ -363,6 +365,7 @@ obstacles.forEach(o => {
 
           try {
             const preds = await model.detect(video);
+            setLatestDetections(preds);
             if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             for (const p of preds) {
@@ -953,6 +956,14 @@ obstacles.forEach(o => {
           </button>
         </div>
       )}
+      
+      <VoiceNavigation 
+        onDestinationSet={(lat, lng, name) => {
+          setDestination(name);
+          setRouteActive(true);
+        }}
+        detections={latestDetections}
+      />
     </div>
   );
 }
