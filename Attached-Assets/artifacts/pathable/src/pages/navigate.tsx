@@ -34,31 +34,31 @@ L.Icon.Default.mergeOptions({
 const CAMPUS_CENTER: [number, number] = [19.075541, 72.991941];
 
 const CAMPUS_BUILDINGS = [
-  { name: "Classroom",    lat: 19.075541, lng: 72.991941 },
-  { name: "HOD Cabin",    lat: 19.075511, lng: 72.991790 },
-  { name: "Computer Lab", lat: 19.075526, lng: 72.991729 },
-  { name: "Washroom",     lat: 19.075515, lng: 72.991749 },
-  { name: "Library",      lat: 19.075466, lng: 72.991408 },
-  { name: "Foyer",        lat: 19.075565, lng: 72.991730 },
+  { name: "Classroom", lat: 19.075541, lng: 72.991941, keywords: ['class', 'classroom', 'room'] },
+  { name: "HOD Cabin", lat: 19.075511, lng: 72.991790, keywords: ['hod', 'cabin', 'head of department'] },
+  { name: "Computer Lab", lat: 19.075526, lng: 72.991729, keywords: ['computer', 'lab', 'labs'] },
+  { name: "Washroom", lat: 19.075515, lng: 72.991749, keywords: ['washroom', 'toilet', 'restroom', 'bathroom'] },
+  { name: "Library", lat: 19.075466, lng: 72.991408, keywords: ['library', 'books'] },
+  { name: "Foyer", lat: 19.075565, lng: 72.991730, keywords: ['foyer', 'entrance', 'lobby'] },
 ];
 
 const SAFE_ZONES = [
-  { name: "Library Rest Area",        lat: 51.5062, lng: -0.0907, desc: "Seating + water fountain near main entrance" },
-  { name: "Science Garden Bench",     lat: 51.5068, lng: -0.0892, desc: "Sheltered outdoor bench, wheelchair accessible" },
-  { name: "Student Centre Quiet Zone",lat: 51.5052, lng: -0.0897, desc: "Low-sensory waiting area, inside ground floor" },
-  { name: "Admin Pathway Rest",       lat: 51.5047, lng: -0.0921, desc: "Covered bench near accessible ramp" },
-  { name: "Cafeteria South Bench",    lat: 51.5043, lng: -0.0903, desc: "Outdoor bench with shade, near step-free exit" },
+  { name: "Library Rest Area", lat: 51.5062, lng: -0.0907, desc: "Seating + water fountain near main entrance" },
+  { name: "Science Garden Bench", lat: 51.5068, lng: -0.0892, desc: "Sheltered outdoor bench, wheelchair accessible" },
+  { name: "Student Centre Quiet Zone", lat: 51.5052, lng: -0.0897, desc: "Low-sensory waiting area, inside ground floor" },
+  { name: "Admin Pathway Rest", lat: 51.5047, lng: -0.0921, desc: "Covered bench near accessible ramp" },
+  { name: "Cafeteria South Bench", lat: 51.5043, lng: -0.0903, desc: "Outdoor bench with shade, near step-free exit" },
 ];
 
 const FIRST_AID_LOCATIONS = [
-  { name: "AED — Library Entrance",     lat: 51.5059, lng: -0.0912, desc: "Automated External Defibrillator + first aid kit. Available 24/7." },
+  { name: "AED — Library Entrance", lat: 51.5059, lng: -0.0912, desc: "Automated External Defibrillator + first aid kit. Available 24/7." },
   { name: "First Aid Room — Medical Centre", lat: 51.5038, lng: -0.0932, desc: "Fully staffed medical room. Mon–Fri 8am–6pm." },
-  { name: "AED — Student Centre",       lat: 51.5048, lng: -0.0902, desc: "Wall-mounted AED inside main lobby." },
+  { name: "AED — Student Centre", lat: 51.5048, lng: -0.0902, desc: "Wall-mounted AED inside main lobby." },
   { name: "First Aid Kit — Engineering Hall", lat: 51.5072, lng: -0.0878, desc: "First aid kit in reception. Staff trained." },
 ];
 
 const CROWD_MAP: Record<number, Record<string, "low" | "medium" | "high">> = {
-  9:  { "Science Block": "high", "Engineering Hall": "high", "Block A": "high", "Library": "medium" },
+  9: { "Science Block": "high", "Engineering Hall": "high", "Block A": "high", "Library": "medium" },
   10: { "Student Centre": "high", "Cafeteria": "medium", "Library": "high" },
   12: { "Cafeteria": "high", "Student Centre": "high", "Library": "medium" },
   13: { "Cafeteria": "high", "Library": "medium", "Block B": "medium" },
@@ -67,9 +67,9 @@ const CROWD_MAP: Record<number, Record<string, "low" | "medium" | "high">> = {
 };
 
 const ROUTE_OPTIONS = [
-  { id: "shortest",         label: "Shortest",         desc: "Quickest step-free path" },
-  { id: "fewest_obstacles", label: "Fewest Obstacles",  desc: "Avoids reported issues" },
-  { id: "rest_stops",       label: "Most Rest Stops",   desc: "Passes safe zone checkpoints" },
+  { id: "shortest", label: "Shortest", desc: "Quickest step-free path" },
+  { id: "fewest_obstacles", label: "Fewest Obstacles", desc: "Avoids reported issues" },
+  { id: "rest_stops", label: "Most Rest Stops", desc: "Passes safe zone checkpoints" },
 ];
 
 const DETECT_INTERVAL_MS = 400;
@@ -97,7 +97,7 @@ function calculateBearing(lat1: number, lng1: number, lat2: number, lng2: number
   const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
   return (toDegrees(Math.atan2(y, x)) + 360) % 360;
 }
-function bearingToDirection(bearing: number) {
+function bearingToDirection(bearing: number): string {
   const directions = [
     "north",
     "north-east",
@@ -108,7 +108,8 @@ function bearingToDirection(bearing: number) {
     "west",
     "north-west",
   ];
-  return directions[Math.round(bearing / 45) % 8];
+  const index = Math.floor((bearing + 22.5) / 45) % 8;
+  return directions[index];
 }
 
 function getCrowd(name: string): "low" | "medium" | "high" {
@@ -143,42 +144,42 @@ function readProfile(): UserProfile {
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function Navigate() {
   // Map refs
-  const mapRef            = useRef<HTMLDivElement>(null);
-  const leafletMapRef     = useRef<L.Map | null>(null);
-  const obstacleGroupRef  = useRef<L.LayerGroup | null>(null);
-  const safeZoneGroupRef  = useRef<L.LayerGroup | null>(null);
-  const firstAidGroupRef  = useRef<L.LayerGroup | null>(null);
+  const mapRef = useRef<HTMLDivElement>(null);
+  const leafletMapRef = useRef<L.Map | null>(null);
+  const obstacleGroupRef = useRef<L.LayerGroup | null>(null);
+  const safeZoneGroupRef = useRef<L.LayerGroup | null>(null);
+  const firstAidGroupRef = useRef<L.LayerGroup | null>(null);
 
   // Camera / perception refs
-  const videoRef          = useRef<HTMLVideoElement>(null);
-  const camCanvasRef      = useRef<HTMLCanvasElement>(null);
-  const modelRef          = useRef<cocoSsd.ObjectDetection | null>(null);
-  const streamRef         = useRef<MediaStream | null>(null);
-  const animRef           = useRef<number | null>(null);
-  const lastDetectRef     = useRef(0);
-  const detectingRef      = useRef(false);
-  const lastAlertRef      = useRef<Record<string, number>>({});
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const camCanvasRef = useRef<HTMLCanvasElement>(null);
+  const modelRef = useRef<cocoSsd.ObjectDetection | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const animRef = useRef<number | null>(null);
+  const lastDetectRef = useRef(0);
+  const detectingRef = useRef(false);
+  const lastAlertRef = useRef<Record<string, number>>({});
 
   // Guidance refs
-  const profileRef        = useRef<UserProfile>(readProfile());
-  const currentTurnRef    = useRef<GuidanceEvent | null>(null);
-  const obstacleClearRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const flashClearRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const positionWatchRef  = useRef<number | null>(null);
-  const userMarkerRef     = useRef<L.CircleMarker | null>(null);
-  const routeLineRef      = useRef<L.Polyline | null>(null);
+  const profileRef = useRef<UserProfile>(readProfile());
+  const currentTurnRef = useRef<GuidanceEvent | null>(null);
+  const obstacleClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const positionWatchRef = useRef<number | null>(null);
+  const userMarkerRef = useRef<L.CircleMarker | null>(null);
+  const routeLineRef = useRef<L.Polyline | null>(null);
   const lastAnnounceBearingRef = useRef<number | null>(null);
-  const lastAnnounceTimeRef    = useRef<number | null>(null);
-  const voiceMutedRef     = useRef(false);
+  const lastAnnounceTimeRef = useRef<number | null>(null);
+  const voiceMutedRef = useRef(false);
 
   // Map state
-  const [showObstacles,  setShowObstacles]  = useState(true);
-  const [showHeatmap,    setShowHeatmap]    = useState(true);
-  const [showSafeZones,  setShowSafeZones]  = useState(true);
-  const [showFirstAid,   setShowFirstAid]   = useState(true);
-  const [selectedRoute,  setSelectedRoute]  = useState("shortest");
-  const [destination,    setDestination]    = useState("");
-  const [routeActive,    setRouteActive]    = useState(false);
+  const [showObstacles, setShowObstacles] = useState(true);
+  const [showHeatmap, setShowHeatmap] = useState(true);
+  const [showSafeZones, setShowSafeZones] = useState(true);
+  const [showFirstAid, setShowFirstAid] = useState(true);
+  const [selectedRoute, setSelectedRoute] = useState("shortest");
+  const [destination, setDestination] = useState("");
+  const [routeActive, setRouteActive] = useState(false);
   const [currentPosition, setCurrentPosition] = useState<{ lat: number; lng: number; accuracy?: number } | null>(null);
   const [distanceToDestination, setDistanceToDestination] = useState<number | null>(null);
   const [navigationDirection, setNavigationDirection] = useState<string | null>(null);
@@ -188,18 +189,37 @@ export default function Navigate() {
   const [lowAccuracyWarning, setLowAccuracyWarning] = useState(false);
 
   // Camera state
-  const [cameraMode,   setCameraMode]   = useState(false);
+  const [cameraMode, setCameraMode] = useState(false);
   const [modelLoading, setModelLoading] = useState(false);
-  const [cameraError,  setCameraError]  = useState<string | null>(null);
-  const [voiceMuted,   setVoiceMuted]   = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [voiceMuted, setVoiceMuted] = useState(false);
   const [latestDetections, setLatestDetections] = useState<any[]>([]);
 
   // Guidance output state
-  const [activeBanner,  setActiveBanner]  = useState<GuidanceEvent | null>(null);
+  const [activeBanner, setActiveBanner] = useState<GuidanceEvent | null>(null);
   const [criticalFlash, setCriticalFlash] = useState(false);
 
-  const profile   = profileRef.current;
+  const profile = profileRef.current;
   const largeText = isLargeTextProfile(profile);
+
+  // ── Voice Assistant Auto-Actions ──────────────────────────────────────────
+  useEffect(() => {
+    const dest = localStorage.getItem("pathable-voice-destination");
+    if (dest) {
+      setDestination(dest);
+      setRouteActive(true);
+      localStorage.removeItem("pathable-voice-destination");
+    }
+
+    const autoCam = localStorage.getItem("pathable-auto-camera");
+    if (autoCam === "true") {
+      localStorage.removeItem("pathable-auto-camera");
+      // Call handleToggleCamera soon after mount; initial cameraMode is false so it will turn ON.
+      setTimeout(() => {
+        handleToggleCamera();
+      }, 500);
+    }
+  }, []);
 
   // ── GuidanceBus: subscribe and dispatch to renderers ─────────────────────
   useEffect(() => {
@@ -239,11 +259,22 @@ export default function Navigate() {
       // VoiceRenderer — obstacle alerts only
       if (event.type === "obstacle" && shouldUseVoice(p) && !mutedNow) {
         window.speechSynthesis.cancel();
-        const u = new SpeechSynthesisUtterance(displayMsg);
-        u.volume = event.severity === "critical" ? 1.0 : 0.85;
-        u.rate   = event.severity === "critical" ? 1.2 : 1.0;
-        u.pitch  = event.severity === "critical" ? 1.3 : 1.0;
-        window.speechSynthesis.speak(u);
+
+        setTimeout(() => {
+          const u = new SpeechSynthesisUtterance(displayMsg);
+          u.volume = event.severity === "critical" ? 1.0 : 0.85;
+          u.rate = event.severity === "critical" ? 1.2 : 1.0;
+          u.pitch = event.severity === "critical" ? 1.3 : 1.0;
+
+          const voices = window.speechSynthesis.getVoices();
+          if (voices.length > 0) {
+            u.voice = voices.find(v => v.lang.startsWith('en')) || voices[0];
+          }
+
+          (window as any)._activeUtterance = u;
+          window.speechSynthesis.resume();
+          window.speechSynthesis.speak(u);
+        }, 50);
       }
 
       // HapticRenderer
@@ -325,8 +356,8 @@ export default function Navigate() {
     if (!map) return;
     if (obstacleGroupRef.current) { map.removeLayer(obstacleGroupRef.current); obstacleGroupRef.current = null; }
     if (!showObstacles || !Array.isArray(obstacles) || obstacles.length === 0) return;
-const g = L.layerGroup();
-obstacles.forEach(o => {
+    const g = L.layerGroup();
+    obstacles.forEach(o => {
       if (!o.lat || !o.lng) return;
       L.circle([o.lat as number, o.lng as number], {
         color: "#ef4444", fillColor: "#ef4444", fillOpacity: 0.5, radius: 25, weight: 2,
@@ -350,16 +381,16 @@ obstacles.forEach(o => {
   // ── Perception engine: obstacle detection ─────────────────────────────────
   function startDetectionLoop() {
     const tick = async (timestamp: number) => {
-      const video  = videoRef.current;
+      const video = videoRef.current;
       const canvas = camCanvasRef.current;
-      const model  = modelRef.current;
+      const model = modelRef.current;
 
       if (video && canvas && model && !detectingRef.current && video.readyState >= 2) {
         if (timestamp - lastDetectRef.current >= DETECT_INTERVAL_MS) {
-          lastDetectRef.current  = timestamp;
-          detectingRef.current   = true;
+          lastDetectRef.current = timestamp;
+          detectingRef.current = true;
 
-          canvas.width  = video.videoWidth  || 640;
+          canvas.width = video.videoWidth || 640;
           canvas.height = video.videoHeight || 480;
           const ctx = canvas.getContext("2d");
 
@@ -379,9 +410,9 @@ obstacles.forEach(o => {
               } else {
                 lastAlertRef.current[p.class] = now;
                 guidanceBus.publish({
-                  type:     "obstacle",
+                  type: "obstacle",
                   severity: risk === "critical" ? "critical" : "routine",
-                  message:  buildObstacleMessage(p.class, risk),
+                  message: buildObstacleMessage(p.class, risk),
                 });
               }
 
@@ -453,7 +484,11 @@ obstacles.forEach(o => {
     // Start camera
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } },
+        video: {
+          facingMode: "environment",
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
       });
       streamRef.current = stream;
       if (videoRef.current) {
@@ -476,10 +511,21 @@ obstacles.forEach(o => {
     const p = profileRef.current;
     if (voiceMutedRef.current || !shouldUseVoice(p) || !('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(message);
-    u.volume = 0.9;
-    u.rate = 1.0;
-    window.speechSynthesis.speak(u);
+
+    setTimeout(() => {
+      const u = new SpeechSynthesisUtterance(message);
+      u.volume = 0.9;
+      u.rate = 1.0;
+
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length > 0) {
+        u.voice = voices.find(v => v.lang.startsWith('en')) || voices[0];
+      }
+
+      (window as any)._activeVoiceUtterance = u;
+      window.speechSynthesis.resume();
+      window.speechSynthesis.speak(u);
+    }, 50);
   }
 
   function clearNavigationWatch() {
@@ -534,16 +580,16 @@ obstacles.forEach(o => {
       const bearing = calculateBearing(latitude, longitude, destinationPoint.lat, destinationPoint.lng);
       const direction = bearingToDirection(bearing);
       const roundedDistance = Math.max(0, Math.round(distance));
-      const banner = distance <= 10
+      const banner = distance <= 25
         ? `You have arrived at ${destination}`
         : `Head ${direction}. ${roundedDistance}m to ${destination}`;
 
       setCurrentPosition({ lat: latitude, lng: longitude, accuracy });
-      setDistanceToDestination(distance <= 10 ? 0 : distance);
-      setNavigationDirection(distance <= 10 ? "" : direction);
-      setNavigationBearing(distance <= 10 ? null : bearing);
+      setDistanceToDestination(distance <= 25 ? 0 : distance);
+      setNavigationDirection(distance <= 25 ? "" : direction);
+      setNavigationBearing(distance <= 25 ? null : bearing);
       setNavigationBanner(banner);
-      setLowAccuracyWarning(accuracy > 50);
+      setLowAccuracyWarning(accuracy > 150);
 
       const displayEvent: GuidanceEvent = {
         type: "turn",
@@ -569,7 +615,7 @@ obstacles.forEach(o => {
         speakNavigationMessage(banner);
       }
 
-      if (distance <= 10) {
+      if (distance <= 25) {
         speakNavigationMessage(`You have arrived at ${destination}`);
         setRouteActive(false);
         return;
@@ -612,8 +658,8 @@ obstacles.forEach(o => {
 
     const watchId = navigator.geolocation.watchPosition(updateMapLocation, handlePositionError, {
       enableHighAccuracy: true,
-      maximumAge: 1000,
-      timeout: 15000,
+      maximumAge: 0,
+      timeout: 10000,
     });
     positionWatchRef.current = watchId;
 
@@ -628,20 +674,20 @@ obstacles.forEach(o => {
       const s = JSON.parse(localStorage.getItem("pathable-wellbeing-today") || "{}");
       const today = new Date().toISOString().split("T")[0];
       if (s.date === today) return s.mood as string;
-    } catch {}
+    } catch { }
     return null;
   })();
   const quietModeActive = wellbeingToday === "stressed" || wellbeingToday === "low_energy";
-  const crowdWarning    = destination && profile.disabilityType === "cognitive" && getCrowd(destination) === "high";
+  const crowdWarning = destination && profile.disabilityType === "cognitive" && getCrowd(destination) === "high";
 
   // Profile indicator chip
   const profileChip = (() => {
     const d = profile.disabilityType;
     if (!d) return null;
-    if (d === "visual")    return { label: "Voice + Haptic active",   color: "bg-violet-100 text-violet-800" };
-    if (d === "hearing")   return { label: "Visual + Haptic active",  color: "bg-blue-100 text-blue-800" };
-    if (d === "cognitive") return { label: "Simplified guidance on",  color: "bg-amber-100 text-amber-800" };
-    if (d === "combination") return { label: "All renderers active",  color: "bg-green-100 text-green-800" };
+    if (d === "visual") return { label: "Voice + Haptic active", color: "bg-violet-100 text-violet-800" };
+    if (d === "hearing") return { label: "Visual + Haptic active", color: "bg-blue-100 text-blue-800" };
+    if (d === "cognitive") return { label: "Simplified guidance on", color: "bg-amber-100 text-amber-800" };
+    if (d === "combination") return { label: "All renderers active", color: "bg-green-100 text-green-800" };
     return null;
   })();
 
@@ -675,11 +721,10 @@ obstacles.forEach(o => {
             <button
               onClick={handleToggleCamera}
               disabled={modelLoading}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
-                cameraMode
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${cameraMode
                   ? "bg-cyan-600 text-white border-cyan-600"
                   : "bg-muted text-muted-foreground border-border hover:border-cyan-400"
-              }`}
+                }`}
               aria-label="Toggle camera obstacle detection"
             >
               {modelLoading ? (
@@ -718,7 +763,14 @@ obstacles.forEach(o => {
             {CAMPUS_BUILDINGS.map(b => <option key={b.name} value={b.name}>{b.name}</option>)}
           </select>
           <Button
-            onClick={() => { setRouteActive(true); }}
+            onClick={() => {
+              setRouteActive(true);
+              if ('speechSynthesis' in window) {
+                const u = new SpeechSynthesisUtterance('');
+                u.volume = 0;
+                window.speechSynthesis.speak(u);
+              }
+            }}
             disabled={!destination}
             size="sm"
             className="gap-1 shrink-0"
@@ -730,17 +782,16 @@ obstacles.forEach(o => {
 
         <div className="flex gap-2 overflow-x-auto scrollbar-none pb-0.5">
           {[
-            { icon: AlertTriangle, label: "Obstacles",  active: showObstacles,  toggle: () => setShowObstacles(!showObstacles) },
-            { icon: Layers,        label: "Crowd Map",  active: showHeatmap,    toggle: () => setShowHeatmap(!showHeatmap) },
-            { icon: Shield,        label: "Safe Zones", active: showSafeZones,  toggle: () => setShowSafeZones(!showSafeZones),  color: "text-blue-600 border-blue-300 bg-blue-50" },
-            { icon: Stethoscope,   label: "First Aid",  active: showFirstAid,   toggle: () => setShowFirstAid(!showFirstAid),   color: "text-red-600 border-red-300 bg-red-50" },
+            { icon: AlertTriangle, label: "Obstacles", active: showObstacles, toggle: () => setShowObstacles(!showObstacles) },
+            { icon: Layers, label: "Crowd Map", active: showHeatmap, toggle: () => setShowHeatmap(!showHeatmap) },
+            { icon: Shield, label: "Safe Zones", active: showSafeZones, toggle: () => setShowSafeZones(!showSafeZones), color: "text-blue-600 border-blue-300 bg-blue-50" },
+            { icon: Stethoscope, label: "First Aid", active: showFirstAid, toggle: () => setShowFirstAid(!showFirstAid), color: "text-red-600 border-red-300 bg-red-50" },
           ].map(({ icon: Icon, label, active, toggle, color }) => (
             <button
               key={label}
               onClick={toggle}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium shrink-0 border transition-all ${
-                active ? (color ?? "bg-primary/10 border-primary/30 text-primary") : "bg-muted border-border text-muted-foreground"
-              }`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium shrink-0 border transition-all ${active ? (color ?? "bg-primary/10 border-primary/30 text-primary") : "bg-muted border-border text-muted-foreground"
+                }`}
               aria-pressed={active}
             >
               <Icon className="h-3.5 w-3.5" /> {label}
@@ -773,7 +824,7 @@ obstacles.forEach(o => {
         />
         <canvas
           ref={camCanvasRef}
-          className={`absolute inset-0 w-full h-full z-[5] pointer-events-none ${cameraMode ? "" : "hidden"}`}
+          className={`absolute inset-0 w-full h-full object-cover z-[5] pointer-events-none ${cameraMode ? "" : "hidden"}`}
         />
 
         {/* Critical flash overlay */}
@@ -824,15 +875,14 @@ obstacles.forEach(o => {
           <div
             role="alert"
             aria-live="assertive"
-            className={`absolute bottom-0 left-0 right-0 z-40 px-4 py-3 transition-colors ${
-              activeBanner.severity === "critical"
+            className={`absolute bottom-0 left-0 right-0 z-40 px-4 py-3 transition-colors ${activeBanner.severity === "critical"
                 ? "bg-red-600"
                 : activeBanner.type === "obstacle"
-                ? "bg-amber-500"
-                : cameraMode
-                ? "bg-black/70 backdrop-blur-md"
-                : "bg-card/95 backdrop-blur-md border-t border-border"
-            }`}
+                  ? "bg-amber-500"
+                  : cameraMode
+                    ? "bg-black/70 backdrop-blur-md"
+                    : "bg-card/95 backdrop-blur-md border-t border-border"
+              }`}
           >
             <div className="flex items-start gap-3 max-w-lg mx-auto">
               {activeBanner.type === "obstacle" ? (
@@ -841,16 +891,14 @@ obstacles.forEach(o => {
                 <Navigation className={`h-5 w-5 shrink-0 mt-0.5 ${cameraMode ? "text-white" : "text-primary"}`} />
               )}
               <div className="flex-1 min-w-0">
-                <p className={`font-bold leading-tight ${
-                  largeText ? "text-xl" : "text-sm"
-                } ${activeBanner.type === "obstacle" || cameraMode ? "text-white" : "text-foreground"}`}>
+                <p className={`font-bold leading-tight ${largeText ? "text-xl" : "text-sm"
+                  } ${activeBanner.type === "obstacle" || cameraMode ? "text-white" : "text-foreground"}`}>
                   {activeBanner.type === "obstacle"
                     ? (activeBanner.severity === "critical" ? "🚨 Critical Obstacle" : "⚠️ Obstacle Detected")
                     : "Navigation update"}
                 </p>
-                <p className={`mt-0.5 leading-snug ${
-                  largeText ? "text-lg font-semibold" : "text-sm"
-                } ${activeBanner.type === "obstacle" || cameraMode ? "text-white/90" : "text-muted-foreground"}`}>
+                <p className={`mt-0.5 leading-snug ${largeText ? "text-lg font-semibold" : "text-sm"
+                  } ${activeBanner.type === "obstacle" || cameraMode ? "text-white/90" : "text-muted-foreground"}`}>
                   {activeBanner.message}
                 </p>
               </div>
@@ -870,11 +918,10 @@ obstacles.forEach(o => {
                   <button
                     key={r.id}
                     onClick={() => setSelectedRoute(r.id)}
-                    className={`flex-1 text-xs p-2 rounded-lg border-2 transition-all ${
-                      selectedRoute === r.id
+                    className={`flex-1 text-xs p-2 rounded-lg border-2 transition-all ${selectedRoute === r.id
                         ? "border-primary bg-primary/10 text-primary"
                         : "border-border bg-background text-muted-foreground"
-                    }`}
+                      }`}
                     aria-pressed={selectedRoute === r.id}
                   >
                     <p className="font-semibold">{r.label}</p>
@@ -956,13 +1003,14 @@ obstacles.forEach(o => {
           </button>
         </div>
       )}
-      
-      <VoiceNavigation 
+
+      <VoiceNavigation
         onDestinationSet={(lat, lng, name) => {
           setDestination(name);
           setRouteActive(true);
         }}
         detections={latestDetections}
+        locations={CAMPUS_BUILDINGS}
       />
     </div>
   );

@@ -5,6 +5,7 @@ import { useGetAdminSummary, useListObstacles, getGetAdminSummaryQueryKey, getLi
 import { Card, CardContent } from "@/components/ui/card";
 import WellbeingModal from "@/components/wellbeing-modal";
 import Tour from "@/components/tour";
+import FloatingVoiceAssistant from "@/components/FloatingVoiceAssistant";
 
 const QUICK_ACTIONS = [
   { href: "/navigate", icon: MapPin, label: "Navigate", desc: "Find accessible routes", color: "bg-primary text-primary-foreground" },
@@ -174,6 +175,8 @@ export default function Home() {
           </button>
         </Link>
       </div>
+
+      <FloatingVoiceAssistant />
     </div>
   );
 }

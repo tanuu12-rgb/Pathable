@@ -16,52 +16,75 @@ function createGesture(
 
 export const ASL_GESTURES: fp.GestureDescription[] = [];
 
+// Thumbs up → "How do I get to the library?"
+const thumbsUp = createGesture("How do I get to the library?", [0], [], [1, 2, 3, 4]);
+thumbsUp.addDirection(fp.Finger.Thumb, fp.FingerDirection.VerticalUp, 1.0);
+ASL_GESTURES.push(thumbsUp);
+
+// Thumbs down → "Is there an accessible restroom near Block B?"
+const thumbsDown = createGesture("Is there an accessible restroom near Block B?", [0], [], [1, 2, 3, 4]);
+thumbsDown.addDirection(fp.Finger.Thumb, fp.FingerDirection.VerticalDown, 1.0);
+ASL_GESTURES.push(thumbsDown);
+
+// Open palm (all 5 fingers extended) → "What do I do if I get stuck?"
+const openPalm = createGesture("What do I do if I get stuck?", [0, 1, 2, 3, 4], [], []);
+ASL_GESTURES.push(openPalm);
+
+// Index finger only → "Where is the nearest first aid kit?"
+const indexPoint = createGesture("Where is the nearest first aid kit?", [1], [], [0, 2, 3, 4]);
+ASL_GESTURES.push(indexPoint);
+
+// Pinky and thumb extended → "Find me a quiet room"
+const pinkyThumb = createGesture("Find me a quiet room", [0, 4], [], [1, 2, 3]);
+ASL_GESTURES.push(pinkyThumb);
+
+// Index and middle fingers extended (peace sign) → "Take me to the classroom"
+const peaceSign = createGesture("Take me to the classroom", [1, 2], [], [0, 3, 4]);
+ASL_GESTURES.push(peaceSign);
+
+// Index, middle and ring fingers extended → "Where is the HOD cabin?"
+const threeFingers = createGesture("Where is the HOD cabin?", [1, 2, 3], [], [0, 4]);
+ASL_GESTURES.push(threeFingers);
+
+// Four fingers extended (index, middle, ring, pinky), thumb closed → "Where is the washroom?"
+const fourFingers = createGesture("Where is the washroom?", [1, 2, 3, 4], [], [0]);
+ASL_GESTURES.push(fourFingers);
+
+// --- ASL Alphabet (Non-conflicting/Basic) ---
+
 // A
-const aSign = createGesture("A", [0], [], [1, 2, 3, 4]); // Thumb open, rest closed
-aSign.addDirection(fp.Finger.Thumb, fp.FingerDirection.VerticalUp, 0.5);
-ASL_GESTURES.push(aSign);
+const letterA = createGesture("Letter A", [0], [], [1, 2, 3, 4]);
+letterA.addDirection(fp.Finger.Thumb, fp.FingerDirection.VerticalUp, 0.5);
+ASL_GESTURES.push(letterA);
 
 // B
-const bSign = createGesture("B", [1, 2, 3, 4], [], [0]); // Fingers up, thumb tucked
-ASL_GESTURES.push(bSign);
+const letterB = createGesture("Letter B", [1, 2, 3, 4], [], [0]);
+ASL_GESTURES.push(letterB);
 
 // C
-const cSign = createGesture("C", [], [0, 1, 2, 3, 4], []); // All half curl
-ASL_GESTURES.push(cSign);
-
-// D
-const dSign = createGesture("D", [1], [], [0, 2, 3, 4]); // Index up
-ASL_GESTURES.push(dSign);
+const letterC = createGesture("Letter C", [], [0, 1, 2, 3, 4], []);
+ASL_GESTURES.push(letterC);
 
 // E
-const eSign = createGesture("E", [], [], [0, 1, 2, 3, 4]); // All full curl
-ASL_GESTURES.push(eSign);
-
-// I Love You (ILY)
-const ilySign = createGesture("I Love You", [0, 1, 4], [], [2, 3]);
-ASL_GESTURES.push(ilySign);
-
-// Peace / V
-const vSign = createGesture("V", [1, 2], [], [0, 3, 4]); 
-ASL_GESTURES.push(vSign);
-
-// W
-const wSign = createGesture("W", [1, 2, 3], [], [0, 4]);
-ASL_GESTURES.push(wSign);
+const letterE = createGesture("Letter E", [], [], [0, 1, 2, 3, 4]);
+ASL_GESTURES.push(letterE);
 
 // F
-const fSign = createGesture("F", [2, 3, 4], [], [0, 1]); // Index and thumb touching
-ASL_GESTURES.push(fSign);
+const letterF = createGesture("Letter F", [2, 3, 4], [], [0, 1]);
+ASL_GESTURES.push(letterF);
+
+// I
+const letterI = createGesture("Letter I", [4], [], [0, 1, 2, 3]);
+ASL_GESTURES.push(letterI);
 
 // L
-const lSign = createGesture("L", [0, 1], [], [2, 3, 4]); // Thumb and index L shape
-ASL_GESTURES.push(lSign);
+const letterL = createGesture("Letter L", [0, 1], [], [2, 3, 4]);
+ASL_GESTURES.push(letterL);
 
-// Y
-const ySign = createGesture("Y", [0, 4], [], [1, 2, 3]); // Thumb and pinky out
-ASL_GESTURES.push(ySign);
+// S (Fist)
+const letterS = createGesture("Letter S", [], [], [0, 1, 2, 3, 4]); // Actually E is similar, but S has thumb over. Fingerpose is bad at this distinction, we'll map E instead and skip S to prevent conflict.
+ASL_GESTURES.pop(); // Remove S
 
-// Thumbs Up (Yes)
-const yesSign = createGesture("Yes", [0], [], [1, 2, 3, 4]);
-yesSign.addDirection(fp.Finger.Thumb, fp.FingerDirection.VerticalUp, 1.0);
-ASL_GESTURES.push(yesSign);
+// X
+const letterX = createGesture("Letter X", [], [1], [0, 2, 3, 4]);
+ASL_GESTURES.push(letterX);

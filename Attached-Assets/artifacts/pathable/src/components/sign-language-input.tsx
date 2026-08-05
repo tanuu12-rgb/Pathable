@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as tf from "@tensorflow/tfjs";
 import * as handpose from "@tensorflow-models/handpose";
-import * as fp from "fingerpose";
-import { ASL_GESTURES } from "@/lib/gestures";
 import { Camera, CameraOff, Loader2, StopCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -21,7 +19,11 @@ export function SignLanguageInput({ onTranslate, onClose }: SignLanguageInputPro
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastGesture, setLastGesture] = useState<string>("");
+  const [detectingGesture, setDetectingGesture] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(false);
+  const [confirmedPulse, setConfirmedPulse] = useState(false);
+  
+  const detectingRef = useRef<{ name: string | null; startTime: number }>({ name: null, startTime: 0 });
 
   useEffect(() => {
     let cancelled = false;
@@ -45,32 +47,87 @@ export function SignLanguageInput({ onTranslate, onClose }: SignLanguageInputPro
     };
   }, []);
 
-  // We now use fingerpose for detection
-  const estimatorRef = useRef<any>(null);
+  const detectGesture = (landmarks: number[][]) => {
+    const wrist = landmarks[0];
+    
+    // Base and tip indices
+    const thumbBase = landmarks[1], thumbTip = landmarks[4];
+    const indexBase = landmarks[5], indexTip = landmarks[8];
+    const middleBase = landmarks[9], middleTip = landmarks[12];
+    const ringBase = landmarks[13], ringTip = landmarks[16];
+    const pinkyBase = landmarks[17], pinkyTip = landmarks[20];
 
-  useEffect(() => {
-    estimatorRef.current = new fp.GestureEstimator(ASL_GESTURES);
+    const thumbExtended = Math.abs(thumbTip[0] - wrist[0]) > Math.abs(thumbBase[0] - wrist[0]);
+    const indexExtended = indexTip[1] < indexBase[1];
+    const middleExtended = middleTip[1] < middleBase[1];
+    const ringExtended = ringTip[1] < ringBase[1];
+    const pinkyExtended = pinkyTip[1] < pinkyBase[1];
+
+    if (thumbExtended && !indexExtended && !middleExtended && !ringExtended && !pinkyExtended) {
+      if (wrist[1] > middleBase[1]) return "How do I get to the library?"; // Thumbs up
+      if (wrist[1] < middleBase[1]) return "Is there an accessible restroom near Block B?"; // Thumbs down
+    }
+
+    if (thumbExtended && indexExtended && middleExtended && ringExtended && pinkyExtended) {
+      return "What do I do if I get stuck?"; // Open palm
+    }
+
+    if (!thumbExtended && indexExtended && !middleExtended && !ringExtended && !pinkyExtended) {
+      return "Where is the nearest first aid kit?"; // Index only
+    }
+
+    if (thumbExtended && !indexExtended && !middleExtended && !ringExtended && pinkyExtended) {
+      return "Find me a quiet room"; // Pinky and thumb
+    }
+
+    if (!thumbExtended && indexExtended && middleExtended && !ringExtended && !pinkyExtended) {
+      return "Take me to the classroom"; // Peace sign
+    }
+
+    if (!thumbExtended && indexExtended && middleExtended && ringExtended && !pinkyExtended) {
+      return "Where is the HOD cabin?"; // Three fingers
+    }
+
+    if (!thumbExtended && indexExtended && middleExtended && ringExtended && pinkyExtended) {
+      return "Where is the washroom?"; // Four fingers
+    }
+
+    return null;
+  };
+
+  const confirmGesture = useCallback((gestureText: string) => {
+    setLastGesture(gestureText);
+    setDetectingGesture(null);
+    detectingRef.current = { name: null, startTime: 0 };
+    
+    setConfirmedPulse(true);
+    setTimeout(() => setConfirmedPulse(false), 500);
+
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(gestureText);
+      u.volume = 0.9;
+      window.speechSynthesis.speak(u);
+    }
   }, []);
 
-  const detectGesture = (landmarks: number[][]) => {
-     if (!estimatorRef.current) return null;
-     
-     // Fingerpose expects a specific format. Handpose provides the array format if mapped to 3D coords,
-     // but fingerpose typically takes the full prediction object or the landmarks array.
-     // Handpose returns landmarks as [x, y, z]. Fingerpose expects this.
-     
-     const est = estimatorRef.current.estimate(landmarks, 8.5); // Minimum confidence 8.5/10
-     
-     if (est.gestures.length > 0) {
-       // Find with highest confidence
-       const result = est.gestures.reduce((p: any, c: any) => { 
-         return (p.score > c.score) ? p : c;
-       });
-       return result.name;
-     }
-
-     return null;
-  };
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const map: Record<string, string> = {
+        '1': "How do I get to the library?",
+        '2': "Is there an accessible restroom near Block B?",
+        '3': "What do I do if I get stuck?",
+        '4': "Where is the nearest first aid kit?",
+        '5': "Find me a quiet room",
+        '6': "Take me to the classroom",
+        '7': "Where is the HOD cabin?",
+        '8': "Where is the washroom?"
+      };
+      if (map[e.key]) confirmGesture(map[e.key]);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [confirmGesture]);
 
   const runDetection = useCallback(() => {
     const tick = async () => {
@@ -107,20 +164,38 @@ export function SignLanguageInput({ onTranslate, onClose }: SignLanguageInputPro
           if (!cooldown) {
             const gestureText = detectGesture(hand.landmarks as number[][]);
             if (gestureText) {
-              setLastGesture(gestureText);
+              const current = detectingRef.current;
+              if (current.name === gestureText) {
+                if (Date.now() - current.startTime >= 1500) {
+                  confirmGesture(gestureText);
+                }
+              } else {
+                detectingRef.current = { name: gestureText, startTime: Date.now() };
+                setDetectingGesture(gestureText);
+              }
+            } else {
+              if (detectingRef.current.name) {
+                detectingRef.current = { name: null, startTime: 0 };
+                setDetectingGesture(null);
+              }
             }
+          }
+        } else {
+          if (detectingRef.current.name) {
+            detectingRef.current = { name: null, startTime: 0 };
+            setDetectingGesture(null);
           }
         }
       }
       animRef.current = requestAnimationFrame(tick);
     };
     animRef.current = requestAnimationFrame(tick);
-  }, [cooldown]);
+  }, [cooldown, confirmGesture]);
 
   const startCamera = async () => {
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-         throw new Error("getUserMedia not supported in this browser. Ensure you are using HTTPS or localhost.");
+         throw new Error("getUserMedia not supported in this browser.");
       }
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
       streamRef.current = stream;
@@ -144,10 +219,10 @@ export function SignLanguageInput({ onTranslate, onClose }: SignLanguageInputPro
     if (!lastGesture) return;
     onTranslate(lastGesture);
     setCooldown(true);
+    setLastGesture("");
     setTimeout(() => {
       setCooldown(false);
-      setLastGesture("");
-    }, 2000); // 2 second cooldown after sending
+    }, 2000); 
   };
 
   return (
@@ -162,7 +237,7 @@ export function SignLanguageInput({ onTranslate, onClose }: SignLanguageInputPro
         </Button>
       </div>
 
-      <div className="relative w-full rounded-xl overflow-hidden bg-black aspect-[4/3]">
+      <div className={`relative w-full rounded-xl overflow-hidden bg-black aspect-[4/3] transition-all duration-300 ${confirmedPulse ? 'ring-4 ring-green-500 scale-[0.98]' : ''}`}>
         <video
           ref={videoRef}
           className="w-full h-full object-cover transform -scale-x-100" // Mirror for user camera
@@ -190,13 +265,34 @@ export function SignLanguageInput({ onTranslate, onClose }: SignLanguageInputPro
         )}
       </div>
 
+      {/* Guide */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 text-[10px] text-muted-foreground p-2 bg-muted/30 rounded-lg">
+        <div><strong className="text-foreground">1.</strong> 👍 Library</div>
+        <div><strong className="text-foreground">2.</strong> 👎 Restroom</div>
+        <div><strong className="text-foreground">3.</strong> 🖐️ Stuck</div>
+        <div><strong className="text-foreground">4.</strong> ☝️ First Aid</div>
+        <div><strong className="text-foreground">5.</strong> 🤙 Quiet Room</div>
+        <div><strong className="text-foreground">6.</strong> ✌️ Classroom</div>
+        <div><strong className="text-foreground">7.</strong> 🖖 HOD Cabin</div>
+        <div><strong className="text-foreground">8.</strong> 🖐️(4) Washroom</div>
+      </div>
+
+      {/* Screen reader live region */}
+      <div aria-live="assertive" className="sr-only">
+        {lastGesture ? `Confirmed: ${lastGesture}` : detectingGesture ? `Detecting: ${detectingGesture}` : ''}
+      </div>
+
       <div className="flex items-center gap-2">
          <div className="flex-1 bg-muted rounded-lg px-3 py-2 border border-border min-h-[40px] flex items-center">
             {lastGesture ? (
-              <span className="text-sm font-bold text-primary">{lastGesture}</span>
+              <span className="text-sm font-bold text-green-600">{lastGesture}</span>
+            ) : detectingGesture ? (
+              <span className="text-sm font-medium text-amber-500 flex items-center gap-2">
+                <Loader2 className="h-3 w-3 animate-spin" /> Detecting: {detectingGesture}...
+              </span>
             ) : (
               <span className="text-xs text-muted-foreground italic">
-                {isLoading ? "Waiting..." : "Try ASL letters: A, B, C, D, E, F, L, V, W, Y or ILY!"}
+                {isLoading ? "Waiting..." : "Hold gesture or press 1-8..."}
               </span>
             )}
          </div>

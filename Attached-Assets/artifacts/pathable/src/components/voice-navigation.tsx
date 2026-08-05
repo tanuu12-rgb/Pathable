@@ -1,31 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Mic, Users } from 'lucide-react';
-import { Marker, Polyline } from 'react-leaflet';
-import L from 'leaflet';
 
-// Create a custom blue dot icon for the user position
-const userIcon = new L.DivIcon({
-  html: `<div style="background-color: blue; width: 15px; height: 15px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5);"></div>`,
-  className: '',
-  iconSize: [15, 15],
-  iconAnchor: [7.5, 7.5]
-});
-
-interface Location {
+export interface Location {
   name: string;
   lat: number;
   lng: number;
-  keywords: string[];
+  keywords?: string[];
 }
-
-const LOCATIONS: Location[] = [
-  { name: 'Classroom', lat: 19.075541, lng: 72.991941, keywords: ['class', 'classroom', 'room'] },
-  { name: 'HOD Cabin', lat: 19.075511, lng: 72.991790, keywords: ['hod', 'cabin', 'head of department'] },
-  { name: 'Computer Lab', lat: 19.075526, lng: 72.991729, keywords: ['computer', 'lab', 'labs'] },
-  { name: 'Washroom', lat: 19.075515, lng: 72.991749, keywords: ['washroom', 'toilet', 'restroom', 'bathroom'] },
-  { name: 'Library', lat: 19.075466, lng: 72.991408, keywords: ['library', 'books'] },
-  { name: 'Foyer', lat: 19.075565, lng: 72.991730, keywords: ['foyer', 'entrance', 'lobby'] }
-];
 
 export interface Detection {
   class: string;
@@ -36,6 +17,7 @@ export interface Detection {
 export interface VoiceNavigationProps {
   onDestinationSet: (lat: number, lng: number, name: string) => void;
   detections: Detection[];
+  locations: Location[];
 }
 
 type Priority = 'CRITICAL' | 'HEAVY_CROWD' | 'GPS' | 'MODERATE_CROWD';
@@ -89,7 +71,7 @@ function getDirectionName(bearing: number) {
   return 'forward';
 }
 
-export default function VoiceNavigation({ onDestinationSet, detections }: VoiceNavigationProps) {
+export default function VoiceNavigation({ onDestinationSet, detections, locations }: VoiceNavigationProps) {
   const [isListening, setIsListening] = useState(false);
   const [announcement, setAnnouncement] = useState('');
   const [crowdCount, setCrowdCount] = useState(0);
@@ -111,7 +93,7 @@ export default function VoiceNavigation({ onDestinationSet, detections }: VoiceN
 
   // Initialize Speech Recognition
   useEffect(() => {
-    const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (SpeechRecognition) {
       recognitionRef.current = new SpeechRecognition();
       recognitionRef.current.continuous = false;
@@ -141,6 +123,7 @@ export default function VoiceNavigation({ onDestinationSet, detections }: VoiceN
 
     isSpeakingRef.current = true;
     const utterance = new SpeechSynthesisUtterance(nextItem.text);
+    (window as any)._activeVoiceNavUtterance = utterance;
     
     utterance.onend = () => {
       isSpeakingRef.current = false;
@@ -152,7 +135,13 @@ export default function VoiceNavigation({ onDestinationSet, detections }: VoiceN
       processQueue();
     };
 
+    const voices = synth.getVoices();
+    if (voices.length > 0) {
+      utterance.voice = voices.find(v => v.lang.startsWith('en')) || voices[0];
+    }
+    
     setAnnouncement(nextItem.text);
+    synth.resume();
     synth.speak(utterance);
   }, [synth]);
 
@@ -263,14 +252,16 @@ export default function VoiceNavigation({ onDestinationSet, detections }: VoiceN
       .trim();
 
     // Try finding a direct match inside cleaned string
-    for (const loc of LOCATIONS) {
-      const match = loc.keywords.some(kw => cleanedText.includes(kw));
+    for (const loc of locations) {
+      const kw = loc.keywords || [loc.name.toLowerCase()];
+      const match = kw.some(k => cleanedText.includes(k.toLowerCase()));
       if (match) return loc;
     }
     
     // Try finding within full transcript just in case
-    for (const loc of LOCATIONS) {
-      const match = loc.keywords.some(kw => lower.includes(kw));
+    for (const loc of locations) {
+      const kw = loc.keywords || [loc.name.toLowerCase()];
+      const match = kw.some(k => lower.includes(k.toLowerCase()));
       if (match) return loc;
     }
 
@@ -283,6 +274,13 @@ export default function VoiceNavigation({ onDestinationSet, detections }: VoiceN
         return;
     }
     
+    // Prime the speech engine on user interaction
+    if ('speechSynthesis' in window) {
+      const prime = new SpeechSynthesisUtterance('');
+      prime.volume = 0;
+      window.speechSynthesis.speak(prime);
+    }
+    
     setIsListening(true);
     setAnnouncement('Listening... speak your destination');
     
@@ -293,31 +291,10 @@ export default function VoiceNavigation({ onDestinationSet, detections }: VoiceN
       const parsedLoc = parseLocation(transcript);
       
       if (parsedLoc) {
-        setAnnouncement(`Setting destination to ${parsedLoc.name}. Say yes to confirm or no to try again.`);
-        let questionUtterance = new SpeechSynthesisUtterance(`Setting destination to ${parsedLoc.name}. Say yes to confirm or no to try again.`);
-        
-        questionUtterance.onend = () => {
-             // Start a new one-off recognition for yes/no
-             const confirmRec = new (window.SpeechRecognition || (window as any).webkitSpeechRecognition)();
-             confirmRec.continuous = false;
-             confirmRec.interimResults = false;
-             confirmRec.onresult = (e: any) => {
-                 const confirmVal = e.results[0][0].transcript.toLowerCase();
-                 if (confirmVal.includes('yes') || confirmVal.includes('yeah') || confirmVal.includes('yep')) {
-                     speak(`Navigation started to ${parsedLoc.name}`);
-                     startNavigation(parsedLoc);
-                 } else if (confirmVal.includes('no') || confirmVal.includes('nope')) {
-                     handleStartListening();
-                 } else {
-                     speak("I didn't understand. Navigation cancelled.");
-                 }
-             };
-             confirmRec.start();
-        };
-        synth.speak(questionUtterance);
-
+        speak(`Navigation started to ${parsedLoc.name}`, 'GPS');
+        startNavigation(parsedLoc);
       } else {
-        const errorText = "Sorry, I didn't catch that. Please say library, computer lab, classroom, washroom, HOD cabin, or foyer";
+        const errorText = "Sorry, I didn't catch that. Please say a valid destination";
         setAnnouncement(errorText);
         speak(errorText, 'GPS');
       }
@@ -388,19 +365,6 @@ export default function VoiceNavigation({ onDestinationSet, detections }: VoiceN
       >
         <Mic className="text-white w-8 h-8" />
       </button>
-
-      {/* Map visual overlays if the component is placed inside a MapContainer. If this component is not inside a map, the user can lift this state. */}
-      {isNavigating && userPosition && destination && (
-        <>
-          <Marker position={userPosition} icon={userIcon} />
-          <Polyline 
-            positions={[userPosition, [destination.lat, destination.lng]]} 
-            color="blue" 
-            dashArray="10, 10" 
-            weight={4} 
-          />
-        </>
-      )}
     </div>
   );
 }
